@@ -1,0 +1,255 @@
+{
+  "Version": 1,
+  "WorkspaceRootPath": "C:\\Users\\LENOVO\\source\\repos\\SpokenEnglishAPI\\",
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{7E63633D-70BA-4212-88CC-E3D368AB8449}|SpokenEnglishAPI\\SpokenEnglishAPI.csproj|c:\\users\\lenovo\\source\\repos\\spokenenglishapi\\spokenenglishapi\\controllers\\learningcontrollers.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{7E63633D-70BA-4212-88CC-E3D368AB8449}|SpokenEnglishAPI\\SpokenEnglishAPI.csproj|solutionrelative:spokenenglishapi\\controllers\\learningcontrollers.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{7E63633D-70BA-4212-88CC-E3D368AB8449}|SpokenEnglishAPI\\SpokenEnglishAPI.csproj|c:\\users\\lenovo\\source\\repos\\spokenenglishapi\\spokenenglishapi\\controllers\\authcontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{7E63633D-70BA-4212-88CC-E3D368AB8449}|SpokenEnglishAPI\\SpokenEnglishAPI.csproj|solutionrelative:spokenenglishapi\\controllers\\authcontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{7E63633D-70BA-4212-88CC-E3D368AB8449}|SpokenEnglishAPI\\SpokenEnglishAPI.csproj|c:\\users\\lenovo\\source\\repos\\spokenenglishapi\\spokenenglishapi\\infrastructure\\repositories\\userrepository.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{7E63633D-70BA-4212-88CC-E3D368AB8449}|SpokenEnglishAPI\\SpokenEnglishAPI.csproj|solutionrelative:spokenenglishapi\\infrastructure\\repositories\\userrepository.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{7E63633D-70BA-4212-88CC-E3D368AB8449}|SpokenEnglishAPI\\SpokenEnglishAPI.csproj|c:\\users\\lenovo\\source\\repos\\spokenenglishapi\\spokenenglishapi\\application\\implementation\\authservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{7E63633D-70BA-4212-88CC-E3D368AB8449}|SpokenEnglishAPI\\SpokenEnglishAPI.csproj|solutionrelative:spokenenglishapi\\application\\implementation\\authservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{7E63633D-70BA-4212-88CC-E3D368AB8449}|SpokenEnglishAPI\\SpokenEnglishAPI.csproj|c:\\users\\lenovo\\source\\repos\\spokenenglishapi\\spokenenglishapi\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{7E63633D-70BA-4212-88CC-E3D368AB8449}|SpokenEnglishAPI\\SpokenEnglishAPI.csproj|solutionrelative:spokenenglishapi\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{7E63633D-70BA-4212-88CC-E3D368AB8449}|SpokenEnglishAPI\\SpokenEnglishAPI.csproj|c:\\users\\lenovo\\source\\repos\\spokenenglishapi\\spokenenglishapi\\application\\interfaces\\iauthservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{7E63633D-70BA-4212-88CC-E3D368AB8449}|SpokenEnglishAPI\\SpokenEnglishAPI.csproj|solutionrelative:spokenenglishapi\\application\\interfaces\\iauthservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{7E63633D-70BA-4212-88CC-E3D368AB8449}|SpokenEnglishAPI\\SpokenEnglishAPI.csproj|c:\\users\\lenovo\\source\\repos\\spokenenglishapi\\spokenenglishapi\\application\\interfaces\\iuserservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{7E63633D-70BA-4212-88CC-E3D368AB8449}|SpokenEnglishAPI\\SpokenEnglishAPI.csproj|solutionrelative:spokenenglishapi\\application\\interfaces\\iuserservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{7E63633D-70BA-4212-88CC-E3D368AB8449}|SpokenEnglishAPI\\SpokenEnglishAPI.csproj|c:\\users\\lenovo\\source\\repos\\spokenenglishapi\\spokenenglishapi\\domain\\dtos\\loginresponsedto.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{7E63633D-70BA-4212-88CC-E3D368AB8449}|SpokenEnglishAPI\\SpokenEnglishAPI.csproj|solutionrelative:spokenenglishapi\\domain\\dtos\\loginresponsedto.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{7E63633D-70BA-4212-88CC-E3D368AB8449}|SpokenEnglishAPI\\SpokenEnglishAPI.csproj|c:\\users\\lenovo\\source\\repos\\spokenenglishapi\\spokenenglishapi\\infrastructure\\security\\jwttokengenerator.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{7E63633D-70BA-4212-88CC-E3D368AB8449}|SpokenEnglishAPI\\SpokenEnglishAPI.csproj|solutionrelative:spokenenglishapi\\infrastructure\\security\\jwttokengenerator.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{7E63633D-70BA-4212-88CC-E3D368AB8449}|SpokenEnglishAPI\\SpokenEnglishAPI.csproj|c:\\users\\lenovo\\source\\repos\\spokenenglishapi\\spokenenglishapi\\domain\\dtos\\registeruserrequestdto.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{7E63633D-70BA-4212-88CC-E3D368AB8449}|SpokenEnglishAPI\\SpokenEnglishAPI.csproj|solutionrelative:spokenenglishapi\\domain\\dtos\\registeruserrequestdto.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{7E63633D-70BA-4212-88CC-E3D368AB8449}|SpokenEnglishAPI\\SpokenEnglishAPI.csproj|c:\\users\\lenovo\\source\\repos\\spokenenglishapi\\spokenenglishapi\\domain\\entities\\user.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{7E63633D-70BA-4212-88CC-E3D368AB8449}|SpokenEnglishAPI\\SpokenEnglishAPI.csproj|solutionrelative:spokenenglishapi\\domain\\entities\\user.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{7E63633D-70BA-4212-88CC-E3D368AB8449}|SpokenEnglishAPI\\SpokenEnglishAPI.csproj|c:\\users\\lenovo\\source\\repos\\spokenenglishapi\\spokenenglishapi\\application\\implementation\\userservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{7E63633D-70BA-4212-88CC-E3D368AB8449}|SpokenEnglishAPI\\SpokenEnglishAPI.csproj|solutionrelative:spokenenglishapi\\application\\implementation\\userservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{7E63633D-70BA-4212-88CC-E3D368AB8449}|SpokenEnglishAPI\\SpokenEnglishAPI.csproj|c:\\users\\lenovo\\source\\repos\\spokenenglishapi\\spokenenglishapi\\domain\\dtos\\loginrequestdto.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{7E63633D-70BA-4212-88CC-E3D368AB8449}|SpokenEnglishAPI\\SpokenEnglishAPI.csproj|solutionrelative:spokenenglishapi\\domain\\dtos\\loginrequestdto.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{7E63633D-70BA-4212-88CC-E3D368AB8449}|SpokenEnglishAPI\\SpokenEnglishAPI.csproj|c:\\users\\lenovo\\source\\repos\\spokenenglishapi\\spokenenglishapi\\middleware\\apikeymiddleware.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{7E63633D-70BA-4212-88CC-E3D368AB8449}|SpokenEnglishAPI\\SpokenEnglishAPI.csproj|solutionrelative:spokenenglishapi\\middleware\\apikeymiddleware.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    }
+  ],
+  "DocumentGroupContainers": [
+    {
+      "Orientation": 0,
+      "VerticalTabListWidth": 256,
+      "DocumentGroups": [
+        {
+          "DockedWidth": 200,
+          "SelectedChildIndex": 1,
+          "Children": [
+            {
+              "$type": "Document",
+              "DocumentIndex": 5,
+              "Title": "IAuthService.cs",
+              "DocumentMoniker": "C:\\Users\\LENOVO\\source\\repos\\SpokenEnglishAPI\\SpokenEnglishAPI\\Application\\Interfaces\\IAuthService.cs",
+              "RelativeDocumentMoniker": "SpokenEnglishAPI\\Application\\Interfaces\\IAuthService.cs",
+              "ToolTip": "C:\\Users\\LENOVO\\source\\repos\\SpokenEnglishAPI\\SpokenEnglishAPI\\Application\\Interfaces\\IAuthService.cs",
+              "RelativeToolTip": "SpokenEnglishAPI\\Application\\Interfaces\\IAuthService.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAuwAYAAAAVAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-12-25T17:11:14.162Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "LearningControllers.cs",
+              "DocumentMoniker": "C:\\Users\\LENOVO\\source\\repos\\SpokenEnglishAPI\\SpokenEnglishAPI\\Controllers\\LearningControllers.cs",
+              "RelativeDocumentMoniker": "SpokenEnglishAPI\\Controllers\\LearningControllers.cs",
+              "ToolTip": "C:\\Users\\LENOVO\\source\\repos\\SpokenEnglishAPI\\SpokenEnglishAPI\\Controllers\\LearningControllers.cs",
+              "RelativeToolTip": "SpokenEnglishAPI\\Controllers\\LearningControllers.cs",
+              "ViewState": "AgIAAGAAAAAAAAAAAAAiwAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-03-15T10:11:15.338Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 4,
+              "Title": "Program.cs",
+              "DocumentMoniker": "C:\\Users\\LENOVO\\source\\repos\\SpokenEnglishAPI\\SpokenEnglishAPI\\Program.cs",
+              "RelativeDocumentMoniker": "SpokenEnglishAPI\\Program.cs",
+              "ToolTip": "C:\\Users\\LENOVO\\source\\repos\\SpokenEnglishAPI\\SpokenEnglishAPI\\Program.cs",
+              "RelativeToolTip": "SpokenEnglishAPI\\Program.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAI8AAAAMAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-12-26T10:12:26.613Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "AuthController.cs",
+              "DocumentMoniker": "C:\\Users\\LENOVO\\source\\repos\\SpokenEnglishAPI\\SpokenEnglishAPI\\Controllers\\AuthController.cs",
+              "RelativeDocumentMoniker": "SpokenEnglishAPI\\Controllers\\AuthController.cs",
+              "ToolTip": "C:\\Users\\LENOVO\\source\\repos\\SpokenEnglishAPI\\SpokenEnglishAPI\\Controllers\\AuthController.cs",
+              "RelativeToolTip": "SpokenEnglishAPI\\Controllers\\AuthController.cs",
+              "ViewState": "AgIAABwAAAAAAAAAAAAgwBoAAAAPAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-12-25T07:05:57.436Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "UserRepository.cs",
+              "DocumentMoniker": "C:\\Users\\LENOVO\\source\\repos\\SpokenEnglishAPI\\SpokenEnglishAPI\\Infrastructure\\Repositories\\UserRepository.cs",
+              "RelativeDocumentMoniker": "SpokenEnglishAPI\\Infrastructure\\Repositories\\UserRepository.cs",
+              "ToolTip": "C:\\Users\\LENOVO\\source\\repos\\SpokenEnglishAPI\\SpokenEnglishAPI\\Infrastructure\\Repositories\\UserRepository.cs",
+              "RelativeToolTip": "SpokenEnglishAPI\\Infrastructure\\Repositories\\UserRepository.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAB0AAAAEAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-12-26T10:32:18.373Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 3,
+              "Title": "AuthService.cs",
+              "DocumentMoniker": "C:\\Users\\LENOVO\\source\\repos\\SpokenEnglishAPI\\SpokenEnglishAPI\\Application\\Implementation\\AuthService.cs",
+              "RelativeDocumentMoniker": "SpokenEnglishAPI\\Application\\Implementation\\AuthService.cs",
+              "ToolTip": "C:\\Users\\LENOVO\\source\\repos\\SpokenEnglishAPI\\SpokenEnglishAPI\\Application\\Implementation\\AuthService.cs",
+              "RelativeToolTip": "SpokenEnglishAPI\\Application\\Implementation\\AuthService.cs",
+              "ViewState": "AgIAABMAAAAAAAAAAAA1wBUAAAAIAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-12-25T17:11:34.984Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 6,
+              "Title": "IUserService.cs",
+              "DocumentMoniker": "C:\\Users\\LENOVO\\source\\repos\\SpokenEnglishAPI\\SpokenEnglishAPI\\Application\\Interfaces\\IUserService.cs",
+              "RelativeDocumentMoniker": "SpokenEnglishAPI\\Application\\Interfaces\\IUserService.cs",
+              "ToolTip": "C:\\Users\\LENOVO\\source\\repos\\SpokenEnglishAPI\\SpokenEnglishAPI\\Application\\Interfaces\\IUserService.cs",
+              "RelativeToolTip": "SpokenEnglishAPI\\Application\\Interfaces\\IUserService.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAsAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-12-26T10:20:55.941Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 7,
+              "Title": "LoginResponseDto.cs",
+              "DocumentMoniker": "C:\\Users\\LENOVO\\source\\repos\\SpokenEnglishAPI\\SpokenEnglishAPI\\Domain\\DTOs\\LoginResponseDto.cs",
+              "RelativeDocumentMoniker": "SpokenEnglishAPI\\Domain\\DTOs\\LoginResponseDto.cs",
+              "ToolTip": "C:\\Users\\LENOVO\\source\\repos\\SpokenEnglishAPI\\SpokenEnglishAPI\\Domain\\DTOs\\LoginResponseDto.cs",
+              "RelativeToolTip": "SpokenEnglishAPI\\Domain\\DTOs\\LoginResponseDto.cs",
+              "ViewState": "AgIAAAcAAAAAAAAAAAAgwBMAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-12-26T09:46:50.268Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 9,
+              "Title": "RegisterUserRequestDto.cs",
+              "DocumentMoniker": "C:\\Users\\LENOVO\\source\\repos\\SpokenEnglishAPI\\SpokenEnglishAPI\\Domain\\DTOs\\RegisterUserRequestDto.cs",
+              "RelativeDocumentMoniker": "SpokenEnglishAPI\\Domain\\DTOs\\RegisterUserRequestDto.cs",
+              "ToolTip": "C:\\Users\\LENOVO\\source\\repos\\SpokenEnglishAPI\\SpokenEnglishAPI\\Domain\\DTOs\\RegisterUserRequestDto.cs",
+              "RelativeToolTip": "SpokenEnglishAPI\\Domain\\DTOs\\RegisterUserRequestDto.cs",
+              "ViewState": "AgIAAAgAAAAAAAAAAADwvxEAAAARAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-12-26T10:44:14.65Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 8,
+              "Title": "JwtTokenGenerator.cs",
+              "DocumentMoniker": "C:\\Users\\LENOVO\\source\\repos\\SpokenEnglishAPI\\SpokenEnglishAPI\\Infrastructure\\Security\\JwtTokenGenerator.cs",
+              "RelativeDocumentMoniker": "SpokenEnglishAPI\\Infrastructure\\Security\\JwtTokenGenerator.cs",
+              "ToolTip": "C:\\Users\\LENOVO\\source\\repos\\SpokenEnglishAPI\\SpokenEnglishAPI\\Infrastructure\\Security\\JwtTokenGenerator.cs",
+              "RelativeToolTip": "SpokenEnglishAPI\\Infrastructure\\Security\\JwtTokenGenerator.cs",
+              "ViewState": "AgIAADIAAAAAAAAAAAAewDsAAAAEAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-12-26T06:13:12.464Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 10,
+              "Title": "User.cs",
+              "DocumentMoniker": "C:\\Users\\LENOVO\\source\\repos\\SpokenEnglishAPI\\SpokenEnglishAPI\\Domain\\Entities\\User.cs",
+              "RelativeDocumentMoniker": "SpokenEnglishAPI\\Domain\\Entities\\User.cs",
+              "ToolTip": "C:\\Users\\LENOVO\\source\\repos\\SpokenEnglishAPI\\SpokenEnglishAPI\\Domain\\Entities\\User.cs",
+              "RelativeToolTip": "SpokenEnglishAPI\\Domain\\Entities\\User.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAABYAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-12-26T10:34:01.376Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 11,
+              "Title": "UserService.cs",
+              "DocumentMoniker": "C:\\Users\\LENOVO\\source\\repos\\SpokenEnglishAPI\\SpokenEnglishAPI\\Application\\Implementation\\UserService.cs",
+              "RelativeDocumentMoniker": "SpokenEnglishAPI\\Application\\Implementation\\UserService.cs",
+              "ToolTip": "C:\\Users\\LENOVO\\source\\repos\\SpokenEnglishAPI\\SpokenEnglishAPI\\Application\\Implementation\\UserService.cs",
+              "RelativeToolTip": "SpokenEnglishAPI\\Application\\Implementation\\UserService.cs",
+              "ViewState": "AgIAABgAAAAAAAAAAAAEwCUAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-12-25T17:16:34.784Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 12,
+              "Title": "LoginRequestDto.cs",
+              "DocumentMoniker": "C:\\Users\\LENOVO\\source\\repos\\SpokenEnglishAPI\\SpokenEnglishAPI\\Domain\\DTOs\\LoginRequestDto.cs",
+              "RelativeDocumentMoniker": "SpokenEnglishAPI\\Domain\\DTOs\\LoginRequestDto.cs",
+              "ToolTip": "C:\\Users\\LENOVO\\source\\repos\\SpokenEnglishAPI\\SpokenEnglishAPI\\Domain\\DTOs\\LoginRequestDto.cs",
+              "RelativeToolTip": "SpokenEnglishAPI\\Domain\\DTOs\\LoginRequestDto.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAuwAgAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-12-25T17:11:19.407Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 13,
+              "Title": "ApiKeyMiddleware.cs",
+              "DocumentMoniker": "C:\\Users\\LENOVO\\source\\repos\\SpokenEnglishAPI\\SpokenEnglishAPI\\Middleware\\ApiKeyMiddleware.cs",
+              "RelativeDocumentMoniker": "SpokenEnglishAPI\\Middleware\\ApiKeyMiddleware.cs",
+              "ToolTip": "C:\\Users\\LENOVO\\source\\repos\\SpokenEnglishAPI\\SpokenEnglishAPI\\Middleware\\ApiKeyMiddleware.cs",
+              "RelativeToolTip": "SpokenEnglishAPI\\Middleware\\ApiKeyMiddleware.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-12-25T17:35:42.971Z"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{d78612c7-9962-4b83-95d9-268046dad23a}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{34e76e81-ee4a-11d0-ae2e-00a0c90fffc3}"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
