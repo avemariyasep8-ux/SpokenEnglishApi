@@ -1,9 +1,8 @@
-﻿using System.Data;
-using Microsoft.Data.SqlClient;
+using System.Data;
+using Npgsql;
 
 namespace SpokenEnglishAPI.Infrastructure.Data
 {
-
     public class DbContext
     {
         private readonly IConfiguration _config;
@@ -14,6 +13,6 @@ namespace SpokenEnglishAPI.Infrastructure.Data
         }
 
         public IDbConnection CreateConnection()
-            => new SqlConnection(_config.GetConnectionString("SE_DB"));
+            => new NpgsqlConnection(_config.GetConnectionString("SE_DB"));
     }
 }
