@@ -37,6 +37,22 @@ namespace SpokenEnglishAPI.Controllers
             return Ok(new { contentId = id });
         }
 
+        [HttpPut("{id}")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> Update(int id, [FromBody] AddWordContentDto dto)
+        {
+            using var con = _db.CreateConnection();
+            await con.ExecuteAsync(
+                @"UPDATE lesson_word_content SET
+                    word_name=@wn, sentence_pattern=@sp,
+                    definition_en=@den, definition_ta=@dta,
+                    example_en=@een, example_ta=@eta, display_order=@ord
+                  WHERE content_id=@id",
+                new { id, wn=dto.WordName, sp=dto.SentencePattern, den=dto.DefinitionEn,
+                      dta=dto.DefinitionTa, een=dto.ExampleEn, eta=dto.ExampleTa, ord=dto.DisplayOrder });
+            return Ok(new { message = "Updated" });
+        }
+
         [HttpDelete("{id}")]
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Delete(int id)

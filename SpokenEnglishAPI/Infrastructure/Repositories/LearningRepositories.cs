@@ -89,7 +89,7 @@ namespace SpokenEnglishAPI.Infrastructure.Repositories
                 {
                     OptionID = (int)r.optionid,
                     OptionText = (string)r.optiontext,
-                    IsCorrect = (bool)r.iscorrect
+                    IsCorrect = r.iscorrect != null && (bool)r.iscorrect
                 }).ToList()
             });
         }
