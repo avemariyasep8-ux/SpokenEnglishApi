@@ -55,24 +55,7 @@ namespace SpokenEnglishAPI.Infrastructure.Repositories
         public MeaningRepository(DbContext context) => _context = context;
 
         public async Task<IEnumerable<MeaningQuizDto>> GetMeaningQuestions(int lessonId, int languageId)
-        {
-            using var con = _context.CreateConnection();
-            var rows = await con.QueryAsync<dynamic>(
-                "SELECT * FROM sp_meaningquestion_get(@p_lessonid, @p_languageid)",
-                new { p_lessonid = lessonId, p_languageid = languageId });
-
-            return rows.GroupBy(r => (int)r.questionid).Select(g => new MeaningQuizDto
-            {
-                QuestionID = g.Key,
-                QuestionText = g.First().questiontext,
-                Options = g.Select(r => new MeaningOptionDto
-                {
-                    OptionID = (int)r.optionid,
-                    OptionText = (string)r.optiontext,
-                    IsCorrect = false
-                }).ToList()
-            });
-        }
+            => await GetMeaningQuestionsWithAnswers(lessonId, languageId);
 
         public async Task<IEnumerable<MeaningQuizDto>> GetMeaningQuestionsWithAnswers(int lessonId, int languageId)
         {
@@ -89,7 +72,7 @@ namespace SpokenEnglishAPI.Infrastructure.Repositories
                 {
                     OptionID = (int)r.optionid,
                     OptionText = (string)r.optiontext,
-                    IsCorrect = r.iscorrect != null && (bool)r.iscorrect
+                    IsCorrect = r.iscorrect is bool b ? b : false
                 }).ToList()
             });
         }
