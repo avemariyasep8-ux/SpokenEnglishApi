@@ -16,7 +16,7 @@ namespace SpokenEnglishAPI.Controllers
         [HttpGet("{lessonId}/{languageId}")]
         public async Task<IActionResult> GetQuestions(int lessonId, int languageId)
         {
-            var questions = await _service.GetMeaningQuestions(lessonId, languageId);
+            var questions = await _service.GetMeaningQuestionsWithAnswers(lessonId, languageId);
             return Ok(questions);
         }
 

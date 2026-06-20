@@ -35,7 +35,8 @@ public class AuthService : IAuthService
             Email = user.Email,
             Token = token,
             RefreshToken = refresh,
-            ApiKey = user.ApiKey
+            ApiKey = user.ApiKey,
+            Role = user.Role
         };
     }
 

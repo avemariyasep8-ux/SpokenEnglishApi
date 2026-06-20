@@ -168,6 +168,221 @@ namespace SpokenEnglishAPI.Controllers
             return Ok(new { message = dto.IsPremium ? "Lesson set as premium" : "Lesson set as free" });
         }
 
+        // ── POST /api/admin/users/{id}/grant-access ──────────────────────────
+        [HttpPost("users/{id}/grant-access")]
+        public async Task<IActionResult> GrantAccess(int id, [FromBody] GrantAccessDto dto)
+        {
+            using var con = _db.CreateConnection();
+            var role = dto.Grant ? "Premium" : "User";
+            await con.ExecuteAsync("UPDATE users SET role=@role WHERE id=@id", new { role, id });
+            return Ok(new { message = dto.Grant ? "Premium access granted" : "Premium access revoked" });
+        }
+
+        // ── GET /api/admin/template/{type} ───────────────────────────────────
+        [HttpGet("template/{type}")]
+        public IActionResult GetTemplate(string type)
+        {
+            var csv = type switch
+            {
+                "lessons" =>
+                    "LessonOrder,LessonName,Description,IsPremium\n" +
+                    "1,Greetings,Learn basic English greetings and introductions,false\n" +
+                    "2,Daily Phrases,Common phrases used every day,false\n" +
+                    "3,IS - Grammar,Learn when and how to use IS,false\n",
+                "wordcontent" =>
+                    "LessonId,WordName,SentencePattern,DefinitionEn,DefinitionTa,ExampleEn,ExampleTa\n" +
+                    "1,Hello,Subject + Hello,A common English greeting,ஒரு பொதுவான வணக்கம்,Hello! How are you?,வணக்கம்! நீங்கள் எப்படி இருக்கிறீர்கள்?\n" +
+                    "1,Good morning,Subject + Good morning,A greeting used in the morning,காலை வணக்கம்,Good morning! Have a nice day!,காலை வணக்கம்! நல்ல நாளாக இருக்கட்டும்!\n",
+                "mcq" =>
+                    "LessonId,QuestionText,Option1,Option2,Option3,Option4,CorrectOption\n" +
+                    "1,She ___ a student.,is,are,am,be,1\n" +
+                    "1,The sky ___ blue.,are,is,am,were,2\n",
+                "arrange" =>
+                    "LessonId,Sentence,HintText\n" +
+                    "1,She is happy.,Subject + is + Adjective\n" +
+                    "1,He is a teacher.,Subject + is + a + Noun\n",
+                _ => null
+            };
+            if (csv == null) return NotFound("Unknown template type");
+            return File(System.Text.Encoding.UTF8.GetBytes(csv), "text/csv", $"{type}_template.csv");
+        }
+
+        // ── POST /api/admin/import/lessons ───────────────────────────────────
+        [HttpPost("import/lessons")]
+        [Consumes("multipart/form-data")]
+        public async Task<IActionResult> ImportLessons(IFormFile file)
+        {
+            if (file == null || file.Length == 0) return BadRequest("No file");
+            using var reader = new System.IO.StreamReader(file.OpenReadStream());
+            var lines = new List<string>();
+            while (!reader.EndOfStream) lines.Add(await reader.ReadLineAsync() ?? "");
+            if (lines.Count < 2) return BadRequest("Empty file");
+
+            using var con = _db.CreateConnection();
+            int imported = 0, skipped = 0;
+
+            foreach (var line in lines.Skip(1))
+            {
+                if (string.IsNullOrWhiteSpace(line)) continue;
+                var cols = ParseCsvLine(line);
+                if (cols.Length < 4) { skipped++; continue; }
+                try
+                {
+                    if (!int.TryParse(cols[0], out int order)) { skipped++; continue; }
+                    var lessonName = cols[1].Trim();
+                    var description = cols[2].Trim();
+                    bool.TryParse(cols[3].Trim().ToLower(), out bool isPremium);
+
+                    var existing = await con.ExecuteScalarAsync<int?>(
+                        "SELECT lessonid FROM lesson WHERE lessonorder=@order", new { order });
+                    int lessonId;
+                    if (existing.HasValue)
+                    {
+                        lessonId = existing.Value;
+                        await con.ExecuteAsync(
+                            "UPDATE lesson SET is_premium=@p WHERE lessonid=@id",
+                            new { p = isPremium, id = lessonId });
+                        await con.ExecuteAsync(
+                            "UPDATE lesson_lang SET lessonname=@n, description=@d WHERE lessonid=@id AND languageid=1",
+                            new { n = lessonName, d = description, id = lessonId });
+                    }
+                    else
+                    {
+                        lessonId = await con.ExecuteScalarAsync<int>(
+                            @"INSERT INTO lesson (lessontypeid, lessonorder, isactive, is_premium)
+                              VALUES (1, @order, true, @p) RETURNING lessonid",
+                            new { order, p = isPremium });
+                        await con.ExecuteAsync(
+                            @"INSERT INTO lesson_lang (lessonid, languageid, lessonname, description)
+                              VALUES (@id, 1, @n, @d)
+                              ON CONFLICT (lessonid, languageid) DO UPDATE SET lessonname=@n, description=@d",
+                            new { id = lessonId, n = lessonName, d = description });
+                    }
+                    imported++;
+                }
+                catch { skipped++; }
+            }
+            return Ok(new { imported, skipped, message = $"Imported {imported} lessons, skipped {skipped}" });
+        }
+
+        // ── POST /api/admin/import/mcq ────────────────────────────────────────
+        [HttpPost("import/mcq")]
+        [Consumes("multipart/form-data")]
+        public async Task<IActionResult> ImportMcq(IFormFile file)
+        {
+            if (file == null || file.Length == 0) return BadRequest("No file");
+            using var reader = new System.IO.StreamReader(file.OpenReadStream());
+            var lines = new List<string>();
+            while (!reader.EndOfStream) lines.Add(await reader.ReadLineAsync() ?? "");
+            if (lines.Count < 2) return BadRequest("Empty file");
+
+            using var con = _db.CreateConnection();
+            int imported = 0, skipped = 0;
+
+            foreach (var line in lines.Skip(1))
+            {
+                if (string.IsNullOrWhiteSpace(line)) continue;
+                var cols = ParseCsvLine(line);
+                if (cols.Length < 7) { skipped++; continue; }
+                try
+                {
+                    if (!int.TryParse(cols[0], out int lessonId)) { skipped++; continue; }
+                    var questionText = cols[1].Trim();
+                    var options = new[] { cols[2].Trim(), cols[3].Trim(), cols[4].Trim(), cols[5].Trim() };
+                    if (!int.TryParse(cols[6].Trim(), out int correctIdx) || correctIdx < 1 || correctIdx > 4) { skipped++; continue; }
+
+                    var qId = await con.ExecuteScalarAsync<int>(
+                        "INSERT INTO meaningquestion (lessonid) VALUES (@lid) RETURNING questionid",
+                        new { lid = lessonId });
+                    await con.ExecuteAsync(
+                        "INSERT INTO meaningquestion_lang (questionid, languageid, questiontext) VALUES (@qid, 1, @qt)",
+                        new { qid = qId, qt = questionText });
+
+                    for (int i = 0; i < options.Length; i++)
+                    {
+                        if (string.IsNullOrWhiteSpace(options[i])) continue;
+                        var optId = await con.ExecuteScalarAsync<int>(
+                            "INSERT INTO meaningoption (questionid, iscorrect) VALUES (@qid, @correct) RETURNING optionid",
+                            new { qid = qId, correct = (i + 1) == correctIdx });
+                        await con.ExecuteAsync(
+                            "INSERT INTO meaningoption_lang (optionid, languageid, optiontext) VALUES (@oid, 1, @ot)",
+                            new { oid = optId, ot = options[i] });
+                    }
+                    imported++;
+                }
+                catch { skipped++; }
+            }
+            return Ok(new { imported, skipped, message = $"Imported {imported} questions, skipped {skipped}" });
+        }
+
+        // ── POST /api/admin/import/arrange ────────────────────────────────────
+        [HttpPost("import/arrange")]
+        [Consumes("multipart/form-data")]
+        public async Task<IActionResult> ImportArrange(IFormFile file)
+        {
+            if (file == null || file.Length == 0) return BadRequest("No file");
+            using var reader = new System.IO.StreamReader(file.OpenReadStream());
+            var lines = new List<string>();
+            while (!reader.EndOfStream) lines.Add(await reader.ReadLineAsync() ?? "");
+            if (lines.Count < 2) return BadRequest("Empty file");
+
+            using var con = _db.CreateConnection();
+            int imported = 0, skipped = 0;
+
+            foreach (var line in lines.Skip(1))
+            {
+                if (string.IsNullOrWhiteSpace(line)) continue;
+                var cols = ParseCsvLine(line);
+                if (cols.Length < 2) { skipped++; continue; }
+                try
+                {
+                    if (!int.TryParse(cols[0], out int lessonId)) { skipped++; continue; }
+                    var sentence = cols[1].Trim();
+                    if (string.IsNullOrWhiteSpace(sentence)) { skipped++; continue; }
+
+                    var words = sentence.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+
+                    // Insert into arrangesentence
+                    var arrId = await con.ExecuteScalarAsync<int>(
+                        "INSERT INTO arrangesentence (lessonid) VALUES (@lid) RETURNING arrangesentenceid",
+                        new { lid = lessonId });
+
+                    // Insert sentence text
+                    await con.ExecuteAsync(
+                        "INSERT INTO arrangesentence_lang (arrangesentenceid, languageid, correctsentence) VALUES (@aid, 1, @s)",
+                        new { aid = arrId, s = sentence });
+
+                    // Insert each word
+                    for (int i = 0; i < words.Length; i++)
+                    {
+                        var wid = await con.ExecuteScalarAsync<int>(
+                            "INSERT INTO arrangesentenceword (arrangesentenceid, correctorder) VALUES (@aid, @ord) RETURNING wordid",
+                            new { aid = arrId, ord = i + 1 });
+                        await con.ExecuteAsync(
+                            "INSERT INTO arrangesentenceword_lang (wordid, languageid, wordtext) VALUES (@wid, 1, @w)",
+                            new { wid, w = words[i] });
+                    }
+                    imported++;
+                }
+                catch { skipped++; }
+            }
+            return Ok(new { imported, skipped, message = $"Imported {imported} sentences, skipped {skipped}" });
+        }
+
+        // ── GET /api/admin/lesson-stats ───────────────────────────────────────
+        [HttpGet("lesson-stats")]
+        public async Task<IActionResult> GetLessonStats()
+        {
+            using var con = _db.CreateConnection();
+            var stats = await con.QueryAsync(
+                @"SELECT l.lessonid,
+                    (SELECT COUNT(*) FROM lesson_word_content wc WHERE wc.lesson_id = l.lessonid) as wordcount,
+                    (SELECT COUNT(*) FROM meaningquestion mq WHERE mq.lessonid = l.lessonid) as mcqcount,
+                    (SELECT COUNT(*) FROM arrangesentence ar WHERE ar.lessonid = l.lessonid) as arrangecount
+                  FROM lesson l ORDER BY l.lessonorder");
+            return Ok(stats);
+        }
+
         private static string[] ParseCsvLine(string line)
         {
             var result = new List<string>();
@@ -186,4 +401,5 @@ namespace SpokenEnglishAPI.Controllers
 
     public record RoleDto(string Role);
     public record PremiumDto(bool IsPremium);
+    public record GrantAccessDto(bool Grant);
 }

@@ -8,14 +8,12 @@
 CREATE OR REPLACE FUNCTION sp_user_login(p_logininput VARCHAR)
 RETURNS TABLE (
     id INT, userguid UUID, email VARCHAR, mobilenumber VARCHAR,
-    passwordhash VARCHAR, apikey VARCHAR, isactive BOOLEAN,
-    role VARCHAR, refreshtoken VARCHAR, refreshtokenexpiry TIMESTAMP
+    passwordhash VARCHAR, apikey VARCHAR, isactive BOOLEAN, role VARCHAR
 ) LANGUAGE plpgsql AS $$
 BEGIN
     RETURN QUERY
     SELECT u.id, u.userguid, u.email, u.mobilenumber,
-           u.passwordhash, u.apikey, u.isactive,
-           u.role, u.refreshtoken, u.refreshtokenexpiry
+           u.passwordhash, u.apikey, u.isactive, u.role
     FROM users u
     WHERE u.isactive = true
       AND (u.email = p_logininput OR u.mobilenumber = p_logininput)
@@ -43,7 +41,7 @@ BEGIN
 END;
 $$;
 
-CREATE OR REPLACE FUNCTION sp_save_refreshtoken(p_userid INT, p_token VARCHAR, p_expiresat TIMESTAMP)
+CREATE OR REPLACE FUNCTION sp_save_refreshtoken(p_userid INT, p_token VARCHAR, p_expiresat TIMESTAMPTZ)
 RETURNS VOID LANGUAGE plpgsql AS $$
 BEGIN
     INSERT INTO refreshtokens (userid, token, expiresat, expirydate, isrevoked, createddate)
@@ -57,14 +55,12 @@ $$;
 CREATE OR REPLACE FUNCTION sp_validate_refreshtoken(p_token VARCHAR)
 RETURNS TABLE (
     id INT, userguid UUID, email VARCHAR, mobilenumber VARCHAR,
-    passwordhash VARCHAR, apikey VARCHAR, isactive BOOLEAN,
-    role VARCHAR, refreshtoken VARCHAR, refreshtokenexpiry TIMESTAMP
+    passwordhash VARCHAR, apikey VARCHAR, isactive BOOLEAN, role VARCHAR
 ) LANGUAGE plpgsql AS $$
 BEGIN
     RETURN QUERY
     SELECT u.id, u.userguid, u.email, u.mobilenumber,
-           u.passwordhash, u.apikey, u.isactive,
-           u.role, u.refreshtoken, u.refreshtokenexpiry
+           u.passwordhash, u.apikey, u.isactive, u.role
     FROM refreshtokens rt
     JOIN users u ON u.id = rt.userid
     WHERE rt.token = p_token AND rt.isrevoked = false AND rt.expirydate > NOW();

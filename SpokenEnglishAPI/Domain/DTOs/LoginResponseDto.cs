@@ -7,6 +7,7 @@ namespace SpokenEnglishAPI.Domain.DTOs
         public string Token { get; set; }
         public string RefreshToken { get; set; }
         public string ApiKey { get; set; }
+        public string Role { get; set; }
     }
     public class RefreshTokenRequestDto
     {
