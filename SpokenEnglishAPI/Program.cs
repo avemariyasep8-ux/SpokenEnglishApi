@@ -26,9 +26,10 @@ namespace SpokenEnglishAPI
                 builder.Configuration["ConnectionStrings:SE_DB"] = npgsql;
             }
 
-            // Railway uses PORT env var
-            var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
-            builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
+            // Railway uses PORT env var — only override URL binding in production
+            var railwayPort = Environment.GetEnvironmentVariable("PORT");
+            if (!string.IsNullOrEmpty(railwayPort))
+                builder.WebHost.UseUrls($"http://0.0.0.0:{railwayPort}");
 
             // ---------------------------------
             // Add services to the container
