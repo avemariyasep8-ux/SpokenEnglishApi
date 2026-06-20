@@ -55,7 +55,10 @@ namespace SpokenEnglishAPI
             builder.Services.AddCors(options =>
             {
                 options.AddPolicy("ReactPolicy", policy =>
-                    policy.WithOrigins(allowedOrigins)
+                    policy.WithOrigins(allowedOrigins.Concat(new[] {
+                              "http://localhost:5173","http://localhost:5174",
+                              "http://localhost:5175","http://localhost:5176"
+                          }).ToArray())
                           .AllowAnyHeader()
                           .AllowAnyMethod()
                           .AllowCredentials());
@@ -86,6 +89,11 @@ namespace SpokenEnglishAPI
             builder.Services.AddScoped<IArrangeService, ArrangeService>();
             builder.Services.AddScoped<IReadingService, ReadingService>();
             builder.Services.AddScoped<IProgressService, ProgressService>();
+
+            // New: word content, subscription, streak
+            builder.Services.AddScoped<WordContentRepository>();
+            builder.Services.AddScoped<SubscriptionRepository>();
+            builder.Services.AddScoped<StreakRepository>();
 
             // ---------------------------------
             // JWT CONFIG

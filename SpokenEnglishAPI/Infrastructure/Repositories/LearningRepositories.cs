@@ -12,8 +12,9 @@ namespace SpokenEnglishAPI.Infrastructure.Repositories
         public async Task<IEnumerable<LessonDto>> GetLessons(int languageId)
         {
             using var con = _context.CreateConnection();
+            // sp_lesson_getall includes is_premium flag
             return await con.QueryAsync<LessonDto>(
-                "SELECT * FROM sp_lesson_get(@p_languageid)",
+                "SELECT * FROM sp_lesson_getall(@p_languageid)",
                 new { p_languageid = languageId });
         }
 
@@ -180,6 +181,70 @@ namespace SpokenEnglishAPI.Infrastructure.Repositories
             return await con.QueryAsync<ReadingSentenceDto>(
                 "SELECT * FROM sp_readingsentence_get(@p_lessonid, @p_languageid)",
                 new { p_lessonid = lessonId, p_languageid = languageId });
+        }
+    }
+
+    public class WordContentRepository
+    {
+        private readonly DbContext _context;
+        public WordContentRepository(DbContext context) => _context = context;
+
+        public async Task<IEnumerable<LessonWordContentDto>> GetWordContent(int lessonId, int languageId)
+        {
+            using var con = _context.CreateConnection();
+            return await con.QueryAsync<LessonWordContentDto>(
+                "SELECT * FROM sp_lessonwordcontent_get(@p_lessonid, @p_languageid)",
+                new { p_lessonid = lessonId, p_languageid = languageId });
+        }
+    }
+
+    public class SubscriptionRepository
+    {
+        private readonly DbContext _context;
+        public SubscriptionRepository(DbContext context) => _context = context;
+
+        public virtual async Task<IEnumerable<SubscriptionPlanDto>> GetPlans()
+        {
+            using var con = _context.CreateConnection();
+            return await con.QueryAsync<SubscriptionPlanDto>("SELECT * FROM sp_subscriptionplan_getall()");
+        }
+
+        public virtual async Task<int> Subscribe(SubscribeRequestDto dto)
+        {
+            using var con = _context.CreateConnection();
+            return await con.ExecuteScalarAsync<int>(
+                "SELECT sp_usersubscription_save(@p_userid, @p_planid, @p_paymentref)",
+                new { p_userid = dto.UserId, p_planid = dto.PlanId, p_paymentref = dto.PaymentRef ?? "" });
+        }
+
+        public virtual async Task<UserSubscriptionDto?> GetUserSubscription(int userId)
+        {
+            using var con = _context.CreateConnection();
+            return await con.QueryFirstOrDefaultAsync<UserSubscriptionDto>(
+                "SELECT * FROM sp_usersubscription_get(@p_userid)",
+                new { p_userid = userId });
+        }
+    }
+
+    public class StreakRepository
+    {
+        private readonly DbContext _context;
+        public StreakRepository(DbContext context) => _context = context;
+
+        public async Task<UserStreakDto> UpdateStreak(int userId, int xpEarned)
+        {
+            using var con = _context.CreateConnection();
+            return await con.QueryFirstAsync<UserStreakDto>(
+                "SELECT * FROM sp_userstreak_update(@p_userid, @p_xp_earned)",
+                new { p_userid = userId, p_xp_earned = xpEarned });
+        }
+
+        public async Task<UserStreakDto?> GetStreak(int userId)
+        {
+            using var con = _context.CreateConnection();
+            return await con.QueryFirstOrDefaultAsync<UserStreakDto>(
+                "SELECT * FROM sp_userstreak_get(@p_userid)",
+                new { p_userid = userId });
         }
     }
 

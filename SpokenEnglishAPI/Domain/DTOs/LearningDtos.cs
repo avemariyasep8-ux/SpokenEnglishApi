@@ -1,5 +1,62 @@
 namespace SpokenEnglishAPI.Domain.DTOs
 {
+    // ─── WORD CONTENT (definition, pattern, example cards) ──────
+    public class LessonWordContentDto
+    {
+        public int ContentId { get; set; }
+        public int LessonId { get; set; }
+        public string WordName { get; set; } = string.Empty;
+        public string? SentencePattern { get; set; }
+        public string DefinitionEn { get; set; } = string.Empty;
+        public string? DefinitionTa { get; set; }
+        public string? ExampleEn { get; set; }
+        public string? ExampleTa { get; set; }
+        public int DisplayOrder { get; set; }
+    }
+
+    // ─── SUBSCRIPTION ────────────────────────────────────────────
+    public class SubscriptionPlanDto
+    {
+        public int PlanId { get; set; }
+        public string PlanName { get; set; } = string.Empty;
+        public int DurationMonths { get; set; }
+        public decimal PriceInr { get; set; }
+        public string? Features { get; set; }
+    }
+
+    public class UserSubscriptionDto
+    {
+        public int SubscriptionId { get; set; }
+        public string PlanName { get; set; } = string.Empty;
+        public DateTime StartDate { get; set; }
+        public DateTime EndDate { get; set; }
+        public string Status { get; set; } = string.Empty;
+        public int DaysRemaining { get; set; }
+    }
+
+    public class SubscribeRequestDto
+    {
+        public int UserId { get; set; }
+        public int PlanId { get; set; }
+        public string? PaymentRef { get; set; }
+    }
+
+    // ─── STREAK ──────────────────────────────────────────────────
+    public class UserStreakDto
+    {
+        public int CurrentStreak { get; set; }
+        public int LongestStreak { get; set; }
+        public int TotalXp { get; set; }
+        public DateTime? LastActivityDate { get; set; }
+    }
+
+    public class UpdateStreakDto
+    {
+        public int UserId { get; set; }
+        public int XpEarned { get; set; }
+    }
+
+
     // ─── LESSON ────────────────────────────────────────────────
     public class LessonDto
     {
@@ -9,6 +66,7 @@ namespace SpokenEnglishAPI.Domain.DTOs
         public string? TypeName { get; set; }
         public int LessonOrder { get; set; }
         public bool IsActive { get; set; }
+        public bool IsPremium { get; set; }
     }
 
     public class AddLessonDto
@@ -113,8 +171,8 @@ namespace SpokenEnglishAPI.Domain.DTOs
     public class UserProgressDto
     {
         public int LessonID { get; set; }
-        public int TotalAttempt { get; set; }
-        public int CorrectCount { get; set; }
+        public long TotalAttempt { get; set; }
+        public long CorrectCount { get; set; }
         public int Accuracy => TotalAttempt == 0 ? 0 : (int)((double)CorrectCount / TotalAttempt * 100);
     }
 
