@@ -16,6 +16,20 @@ namespace SpokenEnglishAPI
         {
             var builder = WebApplication.CreateBuilder(args);
 
+            // Railway provides DATABASE_URL as postgres:// URI — convert to Npgsql format
+            var railwayDb = Environment.GetEnvironmentVariable("DATABASE_URL");
+            if (!string.IsNullOrEmpty(railwayDb))
+            {
+                // postgres://user:pass@host:port/dbname → Host=host;Port=port;Database=dbname;Username=user;Password=pass
+                var uri = new Uri(railwayDb);
+                var npgsql = $"Host={uri.Host};Port={uri.Port};Database={uri.AbsolutePath.TrimStart('/')};Username={uri.UserInfo.Split(':')[0]};Password={uri.UserInfo.Split(':')[1]};SSL Mode=Require;Trust Server Certificate=true";
+                builder.Configuration["ConnectionStrings:SE_DB"] = npgsql;
+            }
+
+            // Railway uses PORT env var
+            var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
+            builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
+
             // ---------------------------------
             // Add services to the container
             // ---------------------------------
@@ -55,13 +69,20 @@ namespace SpokenEnglishAPI
             builder.Services.AddCors(options =>
             {
                 options.AddPolicy("ReactPolicy", policy =>
-                    policy.WithOrigins(allowedOrigins.Concat(new[] {
-                              "http://localhost:5173","http://localhost:5174",
-                              "http://localhost:5175","http://localhost:5176"
-                          }).ToArray())
+                {
+                    // In production allow the Vercel UI domain (set via ALLOWED_ORIGIN env var)
+                    var prodOrigin = Environment.GetEnvironmentVariable("ALLOWED_ORIGIN");
+                    var origins = allowedOrigins.Concat(new[] {
+                        "http://localhost:5173","http://localhost:5174",
+                        "http://localhost:5175","http://localhost:5176"
+                    });
+                    if (!string.IsNullOrEmpty(prodOrigin)) origins = origins.Append(prodOrigin);
+
+                    policy.WithOrigins(origins.ToArray())
                           .AllowAnyHeader()
                           .AllowAnyMethod()
-                          .AllowCredentials());
+                          .AllowCredentials();
+                });
             });
 
             // ---------------------------------
@@ -140,13 +161,17 @@ namespace SpokenEnglishAPI
                 app.UseSwaggerUI();
             }
 
-            app.UseHttpsRedirection();
+            // Skip HTTPS redirect in production (Railway terminates TLS at load balancer)
+            if (app.Environment.IsDevelopment()) app.UseHttpsRedirection();
 
             // CORS must come before Auth
             app.UseCors("ReactPolicy");
 
             app.UseAuthentication();
             app.UseAuthorization();
+
+            // Health check for Railway
+            app.MapGet("/health", () => Results.Ok(new { status = "healthy", time = DateTime.UtcNow }));
 
             app.MapControllers();
             app.Run();
