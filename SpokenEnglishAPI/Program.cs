@@ -22,7 +22,7 @@ namespace SpokenEnglishAPI
             {
                 // postgres://user:pass@host:port/dbname → Host=host;Port=port;Database=dbname;Username=user;Password=pass
                 var uri = new Uri(railwayDb);
-                var npgsql = $"Host={uri.Host};Port={uri.Port};Database={uri.AbsolutePath.TrimStart('/')};Username={uri.UserInfo.Split(':')[0]};Password={uri.UserInfo.Split(':')[1]};SSL Mode=Require;Trust Server Certificate=true";
+                var npgsql = $"Host={uri.Host};Port={uri.Port};Database={uri.AbsolutePath.TrimStart('/')};Username={uri.UserInfo.Split(':')[0]};Password={uri.UserInfo.Split(':')[1]};SSL Mode=Disable";
                 builder.Configuration["ConnectionStrings:SE_DB"] = npgsql;
             }
 
