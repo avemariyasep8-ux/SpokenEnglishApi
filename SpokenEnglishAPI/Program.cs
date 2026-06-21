@@ -1,5 +1,7 @@
 using System.Text;
+using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.IdentityModel.Tokens;
 using SpokenEnglishAPI.Application.Implementation;
 using SpokenEnglishAPI.Application.Interfaces;
@@ -7,6 +9,7 @@ using SpokenEnglishAPI.Application.Services;
 using SpokenEnglishAPI.Infrastructure.Data;
 using SpokenEnglishAPI.Infrastructure.Repositories;
 using SpokenEnglishAPI.Infrastructure.Security;
+using SpokenEnglishAPI.Middleware;
 
 namespace SpokenEnglishAPI
 {
@@ -152,6 +155,34 @@ namespace SpokenEnglishAPI
             builder.Services.AddAuthorization();
 
             // ---------------------------------
+            // Rate limiting (100 req/min per IP, burst 20)
+            // ---------------------------------
+            builder.Services.AddRateLimiter(opts =>
+            {
+                opts.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(ctx =>
+                    RateLimitPartition.GetSlidingWindowLimiter(
+                        ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                        _ => new SlidingWindowRateLimiterOptions
+                        {
+                            PermitLimit = 100,
+                            Window = TimeSpan.FromMinutes(1),
+                            SegmentsPerWindow = 6,
+                            QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                            QueueLimit = 5
+                        }));
+                opts.RejectionStatusCode = 429;
+                opts.OnRejected = async (ctx2, _) =>
+                {
+                    ctx2.HttpContext.Response.Headers["Retry-After"] = "60";
+                    await ctx2.HttpContext.Response.WriteAsJsonAsync(new
+                    {
+                        error = "RATE_LIMIT_EXCEEDED",
+                        message = "Too many requests. Please wait 60 seconds."
+                    });
+                };
+            });
+
+            // ---------------------------------
             // Build app
             // ---------------------------------
             var app = builder.Build();
@@ -162,8 +193,20 @@ namespace SpokenEnglishAPI
                 app.UseSwaggerUI();
             }
 
+            // Global exception handler — must be first so it wraps everything
+            app.UseMiddleware<GlobalExceptionMiddleware>();
+
+            // Security headers on every response
+            app.UseMiddleware<SecurityHeadersMiddleware>();
+
+            // Request/performance logging
+            app.UseMiddleware<RequestLoggingMiddleware>();
+
             // Skip HTTPS redirect in production (Railway terminates TLS at load balancer)
             if (app.Environment.IsDevelopment()) app.UseHttpsRedirection();
+
+            // Rate limiting before CORS/auth
+            app.UseRateLimiter();
 
             // CORS must come before Auth
             app.UseCors("ReactPolicy");
