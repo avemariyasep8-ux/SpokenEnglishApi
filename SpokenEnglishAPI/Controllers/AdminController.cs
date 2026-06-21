@@ -121,6 +121,8 @@ namespace SpokenEnglishAPI.Controllers
         }
 
         // ── POST /api/admin/import/wordcontent ───────────────────────────────
+        // Template format (7 cols): LessonId, WordName, SentencePattern, DefinitionEn, DefinitionTa, ExampleEn, ExampleTa
+        // Export format (10 cols):  ContentId, LessonId, LessonName, WordName, SentencePattern, DefinitionEn, DefinitionTa, ExampleEn, ExampleTa, DisplayOrder
         [HttpPost("import/wordcontent")]
         [Consumes("multipart/form-data")]
         public async Task<IActionResult> ImportWordContent(IFormFile file)
@@ -133,6 +135,11 @@ namespace SpokenEnglishAPI.Controllers
             while (!reader.EndOfStream) lines.Add(await reader.ReadLineAsync() ?? "");
             if (lines.Count < 2) return BadRequest("Empty file");
 
+            // Detect format from header row
+            var header = lines[0].Split(',');
+            bool isExportFormat = header.Length >= 10 &&
+                header[0].Trim().Equals("ContentId", StringComparison.OrdinalIgnoreCase);
+
             using var con = _db.CreateConnection();
             int imported = 0, skipped = 0;
 
@@ -140,23 +147,39 @@ namespace SpokenEnglishAPI.Controllers
             {
                 if (string.IsNullOrWhiteSpace(line)) continue;
                 var cols = ParseCsvLine(line);
-                if (cols.Length < 10) { skipped++; continue; }
-
                 try
                 {
-                    if (!int.TryParse(cols[1], out int lessonId)) { skipped++; continue; }
+                    int lessonId; string wn, sp, den, dta, een, eta; int ord;
+                    if (isExportFormat)
+                    {
+                        // ContentId(0), LessonId(1), LessonName(2), WordName(3), SentencePattern(4), DefinitionEn(5), DefinitionTa(6), ExampleEn(7), ExampleTa(8), DisplayOrder(9)
+                        if (cols.Length < 10) { skipped++; continue; }
+                        if (!int.TryParse(cols[1], out lessonId)) { skipped++; continue; }
+                        wn = cols[3]; sp = cols[4]; den = cols[5]; dta = cols[6]; een = cols[7]; eta = cols[8];
+                        int.TryParse(cols[9], out ord);
+                    }
+                    else
+                    {
+                        // Template: LessonId(0), WordName(1), SentencePattern(2), DefinitionEn(3), DefinitionTa(4), ExampleEn(5), ExampleTa(6), DisplayOrder(7 optional)
+                        if (cols.Length < 7) { skipped++; continue; }
+                        if (!int.TryParse(cols[0], out lessonId)) { skipped++; continue; }
+                        wn = cols[1]; sp = cols[2]; den = cols[3]; dta = cols[4]; een = cols[5]; eta = cols[6];
+                        ord = cols.Length >= 8 && int.TryParse(cols[7], out int o2) ? o2 : 0;
+                    }
+
+                    if (string.IsNullOrWhiteSpace(wn)) { skipped++; continue; }
                     await con.ExecuteAsync(
                         @"INSERT INTO lesson_word_content
                             (lesson_id, word_name, sentence_pattern, definition_en, definition_ta, example_en, example_ta, display_order)
                           VALUES (@lid, @wn, @sp, @den, @dta, @een, @eta, @ord)
                           ON CONFLICT DO NOTHING",
-                        new { lid=lessonId, wn=cols[3], sp=cols[4], den=cols[5], dta=cols[6], een=cols[7], eta=cols[8], ord=int.TryParse(cols[9],out int o)?o:0 });
+                        new { lid=lessonId, wn, sp, den, dta, een, eta, ord });
                     imported++;
                 }
                 catch { skipped++; }
             }
 
-            return Ok(new { imported, skipped });
+            return Ok(new { imported, skipped, message = $"Imported {imported} rows, skipped {skipped}" });
         }
 
         // ── POST /api/admin/lessons/{id}/premium ─────────────────────────────
@@ -190,9 +213,9 @@ namespace SpokenEnglishAPI.Controllers
                     "2,Daily Phrases,Common phrases used every day,false\n" +
                     "3,IS - Grammar,Learn when and how to use IS,false\n",
                 "wordcontent" =>
-                    "LessonId,WordName,SentencePattern,DefinitionEn,DefinitionTa,ExampleEn,ExampleTa\n" +
-                    "1,Hello,Subject + Hello,A common English greeting,ஒரு பொதுவான வணக்கம்,Hello! How are you?,வணக்கம்! நீங்கள் எப்படி இருக்கிறீர்கள்?\n" +
-                    "1,Good morning,Subject + Good morning,A greeting used in the morning,காலை வணக்கம்,Good morning! Have a nice day!,காலை வணக்கம்! நல்ல நாளாக இருக்கட்டும்!\n",
+                    "LessonId,WordName,SentencePattern,DefinitionEn,DefinitionTa,ExampleEn,ExampleTa,DisplayOrder\n" +
+                    "1,Hello,Subject + Hello,A common English greeting,ஒரு பொதுவான வணக்கம்,Hello! How are you?,வணக்கம்! நீங்கள் எப்படி இருக்கிறீர்கள்?,1\n" +
+                    "1,Good morning,Subject + Good morning,A greeting used in the morning,காலை வணக்கம்,Good morning! Have a nice day!,காலை வணக்கம்! நல்ல நாளாக இருக்கட்டும்!,2\n",
                 "mcq" =>
                     "LessonId,QuestionText,Option1,Option2,Option3,Option4,CorrectOption\n" +
                     "1,She ___ a student.,is,are,am,be,1\n" +
@@ -397,9 +420,578 @@ namespace SpokenEnglishAPI.Controllers
             result.Add(current.ToString());
             return result.ToArray();
         }
+
+        // ── POST /api/admin/bulk/wordcontent ──────────────────────────────
+        [HttpPost("bulk/wordcontent")]
+        public async Task<IActionResult> BulkWordContent([FromBody] BulkWordContentDto dto)
+        {
+            using var con = _db.CreateConnection();
+            int inserted = 0;
+            foreach (var row in dto.Rows)
+            {
+                try
+                {
+                    await con.ExecuteAsync(
+                        @"INSERT INTO lesson_word_content (lesson_id, word_name, sentence_pattern, definition_en, definition_ta, example_en, example_ta, display_order)
+                          VALUES (@lid, @word, @pattern, @den, @dta, @een, @eta, @order)",
+                        new { lid = dto.LessonId, word = row.WordName, pattern = row.SentencePattern,
+                              den = row.DefinitionEn, dta = row.DefinitionTa, een = row.ExampleEn,
+                              eta = row.ExampleTa, order = row.DisplayOrder });
+                    inserted++;
+                }
+                catch { }
+            }
+            return Ok(new { inserted, message = $"{inserted} rows inserted" });
+        }
+
+        // ── POST /api/admin/bulk/mcq ──────────────────────────────────────
+        [HttpPost("bulk/mcq")]
+        public async Task<IActionResult> BulkMcq([FromBody] BulkMcqDto dto)
+        {
+            using var con = _db.CreateConnection();
+            int inserted = 0;
+            foreach (var q in dto.Questions)
+            {
+                try
+                {
+                    var qid = await con.ExecuteScalarAsync<int>(
+                        "INSERT INTO meaningquestion (lessonid) VALUES (@lid) RETURNING questionid", new { lid = dto.LessonId });
+                    await con.ExecuteAsync(
+                        "INSERT INTO meaningquestion_lang (questionid, languageid, questiontext) VALUES (@qid, 1, @text)",
+                        new { qid, text = q.QuestionText });
+                    var opts = new[] {
+                        (q.Option1, q.CorrectOption == 1),
+                        (q.Option2, q.CorrectOption == 2),
+                        (q.Option3, q.CorrectOption == 3),
+                        (q.Option4, q.CorrectOption == 4)
+                    };
+                    foreach (var (text, isCorrect) in opts)
+                    {
+                        if (string.IsNullOrWhiteSpace(text)) continue;
+                        var oid = await con.ExecuteScalarAsync<int>(
+                            "INSERT INTO meaningoption (questionid, iscorrect) VALUES (@qid, @c) RETURNING optionid",
+                            new { qid, c = isCorrect });
+                        await con.ExecuteAsync(
+                            "INSERT INTO meaningoption_lang (optionid, languageid, optiontext) VALUES (@oid, 1, @t)",
+                            new { oid, t = text });
+                    }
+                    inserted++;
+                }
+                catch { }
+            }
+            return Ok(new { inserted, message = $"{inserted} questions inserted" });
+        }
+
+        // ── POST /api/admin/bulk/fillin ───────────────────────────────────
+        [HttpPost("bulk/fillin")]
+        public async Task<IActionResult> BulkFillIn([FromBody] BulkFillInDto dto)
+        {
+            using var con = _db.CreateConnection();
+            int inserted = 0;
+            foreach (var row in dto.Rows)
+            {
+                try
+                {
+                    await con.ExecuteAsync(
+                        @"INSERT INTO fillinblank (lessonid, sentence_with_blank, correct_answer, option1, option2, option3, hint_ta, display_order)
+                          VALUES (@lid, @sentence, @answer, @o1, @o2, @o3, @hint, @order)",
+                        new { lid = dto.LessonId, sentence = row.SentenceWithBlank, answer = row.CorrectAnswer,
+                              o1 = row.Option1, o2 = row.Option2, o3 = row.Option3, hint = row.HintTa, order = row.DisplayOrder });
+                    inserted++;
+                }
+                catch { }
+            }
+            return Ok(new { inserted, message = $"{inserted} rows inserted" });
+        }
+
+        // ── POST /api/admin/bulk/arrange ──────────────────────────────────
+        [HttpPost("bulk/arrange")]
+        public async Task<IActionResult> BulkArrange([FromBody] BulkArrangeDto dto)
+        {
+            using var con = _db.CreateConnection();
+            int inserted = 0;
+            foreach (var sentence in dto.Sentences)
+            {
+                if (string.IsNullOrWhiteSpace(sentence)) continue;
+                try
+                {
+                    var aid = await con.ExecuteScalarAsync<int>(
+                        "INSERT INTO arrangesentence (lessonid) VALUES (@lid) RETURNING arrangesentenceid", new { lid = dto.LessonId });
+                    await con.ExecuteAsync(
+                        "INSERT INTO arrangesentence_lang (arrangesentenceid, languageid, correctsentence) VALUES (@aid, 1, @s)",
+                        new { aid, s = sentence });
+                    var words = sentence.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                    for (int i = 0; i < words.Length; i++)
+                    {
+                        var wid = await con.ExecuteScalarAsync<int>(
+                            "INSERT INTO arrangesentenceword (arrangesentenceid, correctorder) VALUES (@aid, @ord) RETURNING wordid",
+                            new { aid, ord = i + 1 });
+                        await con.ExecuteAsync(
+                            "INSERT INTO arrangesentenceword_lang (wordid, languageid, wordtext) VALUES (@wid, 1, @w)",
+                            new { wid, w = words[i] });
+                    }
+                    inserted++;
+                }
+                catch { }
+            }
+            return Ok(new { inserted, message = $"{inserted} sentences inserted" });
+        }
+
+        // ── POST /api/admin/users ─────────────────────────────────────────
+        [HttpPost("users")]
+        public async Task<IActionResult> CreateUser([FromBody] CreateUserAdminDto dto)
+        {
+            using var con = _db.CreateConnection();
+            var exists = await con.ExecuteScalarAsync<int>(
+                "SELECT COUNT(*) FROM users WHERE email=@email", new { email = dto.Email });
+            if (exists > 0) return BadRequest(new { message = "Email already exists" });
+
+            var hash = BCrypt.Net.BCrypt.HashPassword(dto.Password);
+            var apiKey = Guid.NewGuid().ToString("N");
+            var id = await con.ExecuteScalarAsync<int>(
+                @"INSERT INTO users (email, mobilenumber, passwordhash, apikey, role, isactive)
+                  VALUES (@email, @mobile, @hash, @apikey, @role, @active) RETURNING id",
+                new { email = dto.Email, mobile = dto.Mobile, hash, apikey = apiKey,
+                      role = dto.Role ?? "User", active = true });
+            return Ok(new { id, message = "User created" });
+        }
+
+        // ── PUT /api/admin/users/{id} ─────────────────────────────────────
+        [HttpPut("users/{id}")]
+        public async Task<IActionResult> UpdateUser(int id, [FromBody] UpdateUserAdminDto dto)
+        {
+            using var con = _db.CreateConnection();
+            await con.ExecuteAsync(
+                @"UPDATE users SET email=@email, mobilenumber=@mobile, role=@role, isactive=@active
+                  WHERE id=@id",
+                new { email = dto.Email, mobile = dto.Mobile, role = dto.Role, active = dto.IsActive, id });
+            if (!string.IsNullOrWhiteSpace(dto.NewPassword))
+            {
+                var hash = BCrypt.Net.BCrypt.HashPassword(dto.NewPassword);
+                await con.ExecuteAsync("UPDATE users SET passwordhash=@hash WHERE id=@id", new { hash, id });
+            }
+            return Ok(new { message = "User updated" });
+        }
+
+        // ── DELETE /api/admin/users/{id} ──────────────────────────────────
+        [HttpDelete("users/{id}")]
+        public async Task<IActionResult> DeleteUser(int id)
+        {
+            using var con = _db.CreateConnection();
+            await con.ExecuteAsync("UPDATE users SET isactive=false WHERE id=@id", new { id });
+            return Ok(new { message = "User deactivated" });
+        }
+
+        // ── GET /api/admin/lesson-content/{lessonId} ──────────────────────
+        [HttpGet("lesson-content/{lessonId}")]
+        public async Task<IActionResult> GetLessonContent(int lessonId)
+        {
+            using var con = _db.CreateConnection();
+            var wordContent = await con.QueryAsync(
+                @"SELECT content_id as id, word_name, sentence_pattern, definition_en, definition_ta,
+                         example_en, example_ta, display_order
+                  FROM lesson_word_content WHERE lesson_id=@lid ORDER BY display_order",
+                new { lid = lessonId });
+
+            var mcq = await con.QueryAsync(
+                @"SELECT q.questionid as id, mql.questiontext,
+                         json_agg(json_build_object('optionid', o.optionid, 'optiontext', ol.optiontext, 'iscorrect', o.iscorrect)
+                                  ORDER BY o.optionid) as options
+                  FROM meaningquestion q
+                  JOIN meaningquestion_lang mql ON mql.questionid=q.questionid AND mql.languageid=1
+                  JOIN meaningoption o ON o.questionid=q.questionid
+                  JOIN meaningoption_lang ol ON ol.optionid=o.optionid AND ol.languageid=1
+                  WHERE q.lessonid=@lid
+                  GROUP BY q.questionid, mql.questiontext ORDER BY q.questionid",
+                new { lid = lessonId });
+
+            var fillin = await con.QueryAsync(
+                @"SELECT id, sentence_with_blank, correct_answer, option1, option2, option3, hint_ta, display_order
+                  FROM fillinblank WHERE lessonid=@lid ORDER BY display_order",
+                new { lid = lessonId });
+
+            var arrange = await con.QueryAsync(
+                @"SELECT a.arrangesentenceid as id, al.correctsentence,
+                         json_agg(json_build_object('wordid', w.wordid, 'wordtext', wl.wordtext, 'correctorder', w.correctorder)
+                                  ORDER BY w.correctorder) as words
+                  FROM arrangesentence a
+                  JOIN arrangesentence_lang al ON al.arrangesentenceid=a.arrangesentenceid AND al.languageid=1
+                  JOIN arrangesentenceword w ON w.arrangesentenceid=a.arrangesentenceid
+                  JOIN arrangesentenceword_lang wl ON wl.wordid=w.wordid AND wl.languageid=1
+                  WHERE a.lessonid=@lid
+                  GROUP BY a.arrangesentenceid, al.correctsentence ORDER BY a.arrangesentenceid",
+                new { lid = lessonId });
+
+            return Ok(new { wordContent, mcq, fillin, arrange });
+        }
+
+        // ── POST /api/admin/wordcontent ───────────────────────────────────
+        [HttpPost("wordcontent")]
+        public async Task<IActionResult> AddWordContent([FromBody] WordContentDto dto)
+        {
+            using var con = _db.CreateConnection();
+            var id = await con.ExecuteScalarAsync<int>(
+                @"INSERT INTO lesson_word_content (lesson_id, word_name, sentence_pattern, definition_en, definition_ta, example_en, example_ta, display_order)
+                  VALUES (@lid, @word, @pattern, @den, @dta, @een, @eta, @order) RETURNING content_id",
+                new { lid = dto.LessonId, word = dto.WordName, pattern = dto.SentencePattern,
+                      den = dto.DefinitionEn, dta = dto.DefinitionTa, een = dto.ExampleEn,
+                      eta = dto.ExampleTa, order = dto.DisplayOrder });
+            return Ok(new { id, message = "Word content added" });
+        }
+
+        // ── PUT /api/admin/wordcontent/{id} ───────────────────────────────
+        [HttpPut("wordcontent/{id}")]
+        public async Task<IActionResult> UpdateWordContent(int id, [FromBody] WordContentDto dto)
+        {
+            using var con = _db.CreateConnection();
+            await con.ExecuteAsync(
+                @"UPDATE lesson_word_content SET word_name=@word, sentence_pattern=@pattern,
+                  definition_en=@den, definition_ta=@dta, example_en=@een, example_ta=@eta, display_order=@order
+                  WHERE content_id=@id",
+                new { word = dto.WordName, pattern = dto.SentencePattern, den = dto.DefinitionEn,
+                      dta = dto.DefinitionTa, een = dto.ExampleEn, eta = dto.ExampleTa,
+                      order = dto.DisplayOrder, id });
+            return Ok(new { message = "Updated" });
+        }
+
+        // ── DELETE /api/admin/wordcontent/{id} ────────────────────────────
+        [HttpDelete("wordcontent/{id}")]
+        public async Task<IActionResult> DeleteWordContent(int id)
+        {
+            using var con = _db.CreateConnection();
+            await con.ExecuteAsync("DELETE FROM lesson_word_content WHERE content_id=@id", new { id });
+            return Ok(new { message = "Deleted" });
+        }
+
+        // ── POST /api/admin/mcq ───────────────────────────────────────────
+        [HttpPost("mcq")]
+        public async Task<IActionResult> AddMcq([FromBody] McqDto dto)
+        {
+            using var con = _db.CreateConnection();
+            var qid = await con.ExecuteScalarAsync<int>(
+                "INSERT INTO meaningquestion (lessonid) VALUES (@lid) RETURNING questionid",
+                new { lid = dto.LessonId });
+            await con.ExecuteAsync(
+                "INSERT INTO meaningquestion_lang (questionid, languageid, questiontext) VALUES (@qid, 1, @text)",
+                new { qid, text = dto.QuestionText });
+            foreach (var opt in dto.Options)
+            {
+                var oid = await con.ExecuteScalarAsync<int>(
+                    "INSERT INTO meaningoption (questionid, iscorrect) VALUES (@qid, @correct) RETURNING optionid",
+                    new { qid, correct = opt.IsCorrect });
+                await con.ExecuteAsync(
+                    "INSERT INTO meaningoption_lang (optionid, languageid, optiontext) VALUES (@oid, 1, @text)",
+                    new { oid, text = opt.OptionText });
+            }
+            return Ok(new { id = qid, message = "MCQ added" });
+        }
+
+        // ── PUT /api/admin/mcq/{id} ───────────────────────────────────────
+        [HttpPut("mcq/{id}")]
+        public async Task<IActionResult> UpdateMcq(int id, [FromBody] McqDto dto)
+        {
+            using var con = _db.CreateConnection();
+            await con.ExecuteAsync(
+                "UPDATE meaningquestion_lang SET questiontext=@text WHERE questionid=@id AND languageid=1",
+                new { text = dto.QuestionText, id });
+            await con.ExecuteAsync(
+                "DELETE FROM meaningoption_lang WHERE optionid IN (SELECT optionid FROM meaningoption WHERE questionid=@id); DELETE FROM meaningoption WHERE questionid=@id",
+                new { id });
+            foreach (var opt in dto.Options)
+            {
+                var oid = await con.ExecuteScalarAsync<int>(
+                    "INSERT INTO meaningoption (questionid, iscorrect) VALUES (@qid, @correct) RETURNING optionid",
+                    new { qid = id, correct = opt.IsCorrect });
+                await con.ExecuteAsync(
+                    "INSERT INTO meaningoption_lang (optionid, languageid, optiontext) VALUES (@oid, 1, @text)",
+                    new { oid, text = opt.OptionText });
+            }
+            return Ok(new { message = "MCQ updated" });
+        }
+
+        // ── DELETE /api/admin/mcq/{id} ────────────────────────────────────
+        [HttpDelete("mcq/{id}")]
+        public async Task<IActionResult> DeleteMcq(int id)
+        {
+            using var con = _db.CreateConnection();
+            await con.ExecuteAsync(
+                "DELETE FROM meaningoption_lang WHERE optionid IN (SELECT optionid FROM meaningoption WHERE questionid=@id)", new { id });
+            await con.ExecuteAsync("DELETE FROM meaningoption WHERE questionid=@id", new { id });
+            await con.ExecuteAsync("DELETE FROM meaningquestion_lang WHERE questionid=@id", new { id });
+            await con.ExecuteAsync("DELETE FROM meaningquestion WHERE questionid=@id", new { id });
+            return Ok(new { message = "MCQ deleted" });
+        }
+
+        // ── POST /api/admin/fillin ────────────────────────────────────────
+        [HttpPost("fillin")]
+        public async Task<IActionResult> AddFillIn([FromBody] FillInDto dto)
+        {
+            using var con = _db.CreateConnection();
+            var id = await con.ExecuteScalarAsync<int>(
+                @"INSERT INTO fillinblank (lessonid, sentence_with_blank, correct_answer, option1, option2, option3, hint_ta, display_order)
+                  VALUES (@lid, @sentence, @answer, @o1, @o2, @o3, @hint, @order) RETURNING id",
+                new { lid = dto.LessonId, sentence = dto.SentenceWithBlank, answer = dto.CorrectAnswer,
+                      o1 = dto.Option1, o2 = dto.Option2, o3 = dto.Option3, hint = dto.HintTa, order = dto.DisplayOrder });
+            return Ok(new { id, message = "Fill-in-blank added" });
+        }
+
+        // ── PUT /api/admin/fillin/{id} ────────────────────────────────────
+        [HttpPut("fillin/{id}")]
+        public async Task<IActionResult> UpdateFillIn(int id, [FromBody] FillInDto dto)
+        {
+            using var con = _db.CreateConnection();
+            await con.ExecuteAsync(
+                @"UPDATE fillinblank SET sentence_with_blank=@sentence, correct_answer=@answer,
+                  option1=@o1, option2=@o2, option3=@o3, hint_ta=@hint, display_order=@order WHERE id=@id",
+                new { sentence = dto.SentenceWithBlank, answer = dto.CorrectAnswer, o1 = dto.Option1,
+                      o2 = dto.Option2, o3 = dto.Option3, hint = dto.HintTa, order = dto.DisplayOrder, id });
+            return Ok(new { message = "Updated" });
+        }
+
+        // ── DELETE /api/admin/fillin/{id} ─────────────────────────────────
+        [HttpDelete("fillin/{id}")]
+        public async Task<IActionResult> DeleteFillIn(int id)
+        {
+            using var con = _db.CreateConnection();
+            await con.ExecuteAsync("DELETE FROM fillinblank WHERE id=@id", new { id });
+            return Ok(new { message = "Deleted" });
+        }
+
+        // ── POST /api/admin/arrange ───────────────────────────────────────
+        [HttpPost("arrange")]
+        public async Task<IActionResult> AddArrange([FromBody] ArrangeDto dto)
+        {
+            using var con = _db.CreateConnection();
+            var aid = await con.ExecuteScalarAsync<int>(
+                "INSERT INTO arrangesentence (lessonid) VALUES (@lid) RETURNING arrangesentenceid",
+                new { lid = dto.LessonId });
+            await con.ExecuteAsync(
+                "INSERT INTO arrangesentence_lang (arrangesentenceid, languageid, correctsentence) VALUES (@aid, 1, @s)",
+                new { aid, s = dto.CorrectSentence });
+            var words = dto.CorrectSentence.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            for (int i = 0; i < words.Length; i++)
+            {
+                var wid = await con.ExecuteScalarAsync<int>(
+                    "INSERT INTO arrangesentenceword (arrangesentenceid, correctorder) VALUES (@aid, @ord) RETURNING wordid",
+                    new { aid, ord = i + 1 });
+                await con.ExecuteAsync(
+                    "INSERT INTO arrangesentenceword_lang (wordid, languageid, wordtext) VALUES (@wid, 1, @w)",
+                    new { wid, w = words[i] });
+            }
+            return Ok(new { id = aid, message = "Arrange sentence added" });
+        }
+
+        // ── DELETE /api/admin/arrange/{id} ────────────────────────────────
+        [HttpDelete("arrange/{id}")]
+        public async Task<IActionResult> DeleteArrange(int id)
+        {
+            using var con = _db.CreateConnection();
+            await con.ExecuteAsync(
+                "DELETE FROM arrangesentenceword_lang WHERE wordid IN (SELECT wordid FROM arrangesentenceword WHERE arrangesentenceid=@id)", new { id });
+            await con.ExecuteAsync("DELETE FROM arrangesentenceword WHERE arrangesentenceid=@id", new { id });
+            await con.ExecuteAsync("DELETE FROM arrangesentence_lang WHERE arrangesentenceid=@id", new { id });
+            await con.ExecuteAsync("DELETE FROM arrangesentence WHERE arrangesentenceid=@id", new { id });
+            return Ok(new { message = "Deleted" });
+        }
+
+        // ── GET /api/admin/reports/overview ───────────────────────────────
+        [HttpGet("reports/overview")]
+        public async Task<IActionResult> GetReportsOverview()
+        {
+            using var con = _db.CreateConnection();
+            var totalUsers = await con.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM users WHERE role != 'Admin'");
+            var activeUsers = await con.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM users WHERE isactive=true AND role != 'Admin'");
+            var totalLessons = await con.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM lesson WHERE isactive=true");
+            var completions = await con.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM user_lesson_progress WHERE is_completed=true");
+            var topLesson = await con.QueryFirstOrDefaultAsync(
+                @"SELECT ll.lessonname, COUNT(ulp.id) as completions
+                  FROM user_lesson_progress ulp
+                  JOIN lesson_lang ll ON ll.lessonid=ulp.lesson_id AND ll.languageid=1
+                  WHERE ulp.is_completed=true
+                  GROUP BY ll.lessonname ORDER BY completions DESC LIMIT 1");
+            return Ok(new { totalUsers, activeUsers, totalLessons, completions, topLesson });
+        }
+
+        // ── GET /api/admin/reports/users ──────────────────────────────────
+        [HttpGet("reports/users")]
+        public async Task<IActionResult> GetUserReports()
+        {
+            using var con = _db.CreateConnection();
+            var rows = await con.QueryAsync(
+                @"SELECT u.id, u.email, u.mobilenumber, u.role, u.isactive, u.createddate,
+                         COUNT(DISTINCT ulp.lesson_id) FILTER (WHERE ulp.is_completed=true) as lessons_completed,
+                         COALESCE(SUM(ulp.time_spent_seconds),0) as total_time_seconds,
+                         COALESCE(SUM(ulp.correct_answers),0) as correct_answers,
+                         COALESCE(SUM(ulp.wrong_answers),0) as wrong_answers,
+                         MAX(ulp.last_activity) as last_activity
+                  FROM users u
+                  LEFT JOIN user_lesson_progress ulp ON ulp.user_id=u.id
+                  WHERE u.role != 'Admin'
+                  GROUP BY u.id ORDER BY u.id DESC LIMIT 500");
+            return Ok(rows);
+        }
+
+        // ── GET /api/admin/reports/user/{userId} ──────────────────────────
+        [HttpGet("reports/user/{userId}")]
+        public async Task<IActionResult> GetUserReport(int userId)
+        {
+            using var con = _db.CreateConnection();
+            var user = await con.QueryFirstOrDefaultAsync(
+                "SELECT id, email, mobilenumber, role, isactive, createddate FROM users WHERE id=@id", new { id = userId });
+            if (user == null) return NotFound();
+
+            var lessonProgress = await con.QueryAsync(
+                @"SELECT l.lessonid, ll.lessonname, l.lessonorder,
+                         ulp.is_completed, ulp.completed_date, ulp.time_spent_seconds,
+                         ulp.correct_answers, ulp.wrong_answers, ulp.total_attempts, ulp.last_activity
+                  FROM lesson l
+                  JOIN lesson_lang ll ON ll.lessonid=l.lessonid AND ll.languageid=1
+                  LEFT JOIN user_lesson_progress ulp ON ulp.lesson_id=l.lessonid AND ulp.user_id=@uid
+                  WHERE l.isactive=true ORDER BY l.lessonorder",
+                new { uid = userId });
+
+            var dailyActivity = await con.QueryAsync(
+                @"SELECT DATE(last_activity) as activity_date,
+                         COUNT(*) as lessons_touched,
+                         SUM(time_spent_seconds) as time_spent
+                  FROM user_lesson_progress
+                  WHERE user_id=@uid AND last_activity IS NOT NULL
+                  GROUP BY DATE(last_activity) ORDER BY activity_date DESC LIMIT 30",
+                new { uid = userId });
+
+            return Ok(new { user, lessonProgress, dailyActivity });
+        }
+
+        // ── POST /api/admin/progress/upsert ───────────────────────────────
+        [HttpPost("progress/upsert")]
+        public async Task<IActionResult> UpsertProgress([FromBody] UpsertProgressDto dto)
+        {
+            using var con = _db.CreateConnection();
+            await con.ExecuteAsync(
+                @"INSERT INTO user_lesson_progress (user_id, lesson_id, is_completed, completed_date, time_spent_seconds, correct_answers, wrong_answers, total_attempts, last_activity)
+                  VALUES (@uid, @lid, @done, @date, @time, @correct, @wrong, @attempts, NOW())
+                  ON CONFLICT (user_id, lesson_id) DO UPDATE SET
+                    is_completed = EXCLUDED.is_completed OR user_lesson_progress.is_completed,
+                    completed_date = CASE WHEN EXCLUDED.is_completed THEN COALESCE(EXCLUDED.completed_date, NOW()) ELSE user_lesson_progress.completed_date END,
+                    time_spent_seconds = user_lesson_progress.time_spent_seconds + EXCLUDED.time_spent_seconds,
+                    correct_answers = user_lesson_progress.correct_answers + EXCLUDED.correct_answers,
+                    wrong_answers = user_lesson_progress.wrong_answers + EXCLUDED.wrong_answers,
+                    total_attempts = user_lesson_progress.total_attempts + EXCLUDED.total_attempts,
+                    last_activity = NOW()",
+                new { uid = dto.UserId, lid = dto.LessonId, done = dto.IsCompleted, date = dto.CompletedDate,
+                      time = dto.TimeSpentSeconds, correct = dto.CorrectAnswers, wrong = dto.WrongAnswers,
+                      attempts = dto.TotalAttempts });
+            return Ok(new { message = "Progress saved" });
+        }
+
+        // ── GET /api/admin/lessons-list ────────────────────────────────────
+        [HttpGet("lessons-list")]
+        public async Task<IActionResult> GetLessonsList()
+        {
+            using var con = _db.CreateConnection();
+            var lessons = await con.QueryAsync(
+                @"SELECT l.lessonid, ll.lessonname, ll.description, l.lessonorder, l.isactive, l.is_premium,
+                         (SELECT COUNT(*) FROM lesson_word_content wc WHERE wc.lesson_id=l.lessonid) as word_count,
+                         (SELECT COUNT(*) FROM meaningquestion mq WHERE mq.lessonid=l.lessonid) as mcq_count,
+                         (SELECT COUNT(*) FROM fillinblank fb WHERE fb.lessonid=l.lessonid) as fillin_count,
+                         (SELECT COUNT(*) FROM arrangesentence ar WHERE ar.lessonid=l.lessonid) as arrange_count
+                  FROM lesson l
+                  JOIN lesson_lang ll ON ll.lessonid=l.lessonid AND ll.languageid=1
+                  ORDER BY l.lessonorder");
+            return Ok(lessons);
+        }
+
+        // ── POST /api/admin/lessons ───────────────────────────────────────
+        [HttpPost("lessons")]
+        public async Task<IActionResult> CreateLesson([FromBody] CreateLessonDto dto)
+        {
+            using var con = _db.CreateConnection();
+            var maxOrder = await con.ExecuteScalarAsync<int>("SELECT COALESCE(MAX(lessonorder),0) FROM lesson") + 1;
+            var lid = await con.ExecuteScalarAsync<int>(
+                "INSERT INTO lesson (lessontypeid, lessonorder, isactive, is_premium) VALUES (1, @ord, true, @prem) RETURNING lessonid",
+                new { ord = dto.LessonOrder ?? maxOrder, prem = dto.IsPremium });
+            await con.ExecuteAsync(
+                "INSERT INTO lesson_lang (lessonid, languageid, lessonname, description) VALUES (@lid, 1, @name, @desc)",
+                new { lid, name = dto.LessonName, desc = dto.Description });
+            return Ok(new { id = lid, message = "Lesson created" });
+        }
+
+        // ── PUT /api/admin/lessons/{id} ────────────────────────────────────
+        [HttpPut("lessons/{id}")]
+        public async Task<IActionResult> UpdateLesson(int id, [FromBody] CreateLessonDto dto)
+        {
+            using var con = _db.CreateConnection();
+            await con.ExecuteAsync(
+                "UPDATE lesson SET lessonorder=@ord, isactive=@active, is_premium=@prem WHERE lessonid=@id",
+                new { ord = dto.LessonOrder, active = dto.IsActive, prem = dto.IsPremium, id });
+            await con.ExecuteAsync(
+                "UPDATE lesson_lang SET lessonname=@name, description=@desc WHERE lessonid=@id AND languageid=1",
+                new { name = dto.LessonName, desc = dto.Description, id });
+            return Ok(new { message = "Lesson updated" });
+        }
+
+        // ── DELETE /api/admin/lessons/{id} ────────────────────────────────
+        [HttpDelete("lessons/{id}")]
+        public async Task<IActionResult> DeleteLesson(int id)
+        {
+            using var con = _db.CreateConnection();
+            await con.ExecuteAsync("UPDATE lesson SET isactive=false WHERE lessonid=@id", new { id });
+            return Ok(new { message = "Lesson deactivated" });
+        }
+
+        // ── POST /api/admin/users/{id}/lesson-access ──────────────────────
+        [HttpPost("users/{id}/lesson-access")]
+        public async Task<IActionResult> SetLessonAccess(int id, [FromBody] LessonAccessDto dto)
+        {
+            using var con = _db.CreateConnection();
+            await con.ExecuteAsync(
+                @"INSERT INTO user_lesson_access (user_id, lesson_id, has_access)
+                  VALUES (@uid, @lid, @access)
+                  ON CONFLICT (user_id, lesson_id) DO UPDATE SET has_access=@access",
+                new { uid = id, lid = dto.LessonId, access = dto.HasAccess });
+            return Ok(new { message = "Access updated" });
+        }
+
+        // ── GET /api/admin/users/{id}/lesson-access ───────────────────────
+        [HttpGet("users/{id}/lesson-access")]
+        public async Task<IActionResult> GetUserLessonAccess(int id)
+        {
+            using var con = _db.CreateConnection();
+            var rows = await con.QueryAsync(
+                @"SELECT l.lessonid, ll.lessonname, l.lessonorder,
+                         COALESCE(ula.has_access, true) as has_access
+                  FROM lesson l
+                  JOIN lesson_lang ll ON ll.lessonid=l.lessonid AND ll.languageid=1
+                  LEFT JOIN user_lesson_access ula ON ula.lesson_id=l.lessonid AND ula.user_id=@uid
+                  WHERE l.isactive=true ORDER BY l.lessonorder",
+                new { uid = id });
+            return Ok(rows);
+        }
     }
 
     public record RoleDto(string Role);
     public record PremiumDto(bool IsPremium);
     public record GrantAccessDto(bool Grant);
+    public record CreateUserAdminDto(string Email, string Mobile, string Password, string? Role);
+    public record UpdateUserAdminDto(string Email, string Mobile, string Role, bool IsActive, string? NewPassword);
+    public record WordContentDto(int LessonId, string WordName, string SentencePattern, string DefinitionEn, string DefinitionTa, string ExampleEn, string ExampleTa, int DisplayOrder);
+    public record McqOptionDto(string OptionText, bool IsCorrect);
+    public record McqDto(int LessonId, string QuestionText, List<McqOptionDto> Options);
+    public record FillInDto(int LessonId, string SentenceWithBlank, string CorrectAnswer, string? Option1, string? Option2, string? Option3, string? HintTa, int DisplayOrder);
+    public record ArrangeDto(int LessonId, string CorrectSentence);
+    public record CreateLessonDto(string LessonName, string? Description, int? LessonOrder, bool IsActive, bool IsPremium);
+    public record LessonAccessDto(int LessonId, bool HasAccess);
+    public record UpsertProgressDto(int UserId, int LessonId, bool IsCompleted, DateTime? CompletedDate, int TimeSpentSeconds, int CorrectAnswers, int WrongAnswers, int TotalAttempts);
+
+    public record BulkWordRow(string WordName, string SentencePattern, string DefinitionEn, string DefinitionTa, string ExampleEn, string ExampleTa, int DisplayOrder);
+    public record BulkWordContentDto(int LessonId, List<BulkWordRow> Rows);
+
+    public record BulkMcqRow(string QuestionText, string Option1, string Option2, string Option3, string Option4, int CorrectOption);
+    public record BulkMcqDto(int LessonId, List<BulkMcqRow> Questions);
+
+    public record BulkFillInRow(string SentenceWithBlank, string CorrectAnswer, string Option1, string Option2, string Option3, string HintTa, int DisplayOrder);
+    public record BulkFillInDto(int LessonId, List<BulkFillInRow> Rows);
+
+    public record BulkArrangeDto(int LessonId, List<string> Sentences);
 }
+
