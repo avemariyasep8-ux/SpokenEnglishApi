@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("SpokenEnglishAPI")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+34f9ec505ebeccff2b7e5b3566632e0baa7190bb")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+97ad335d20222374983e8334ec84b08b6ff48311")]
 [assembly: System.Reflection.AssemblyProductAttribute("SpokenEnglishAPI")]
 [assembly: System.Reflection.AssemblyTitleAttribute("SpokenEnglishAPI")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
