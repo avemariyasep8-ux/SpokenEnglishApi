@@ -147,6 +147,7 @@ namespace SpokenEnglishAPI.Infrastructure.Repositories
                 {
                     ArrangeSentenceID = g.Key,
                     CorrectSentence = g.First().correctsentence,
+                    TamilMeaning = g.First().tamilmeaning as string,
                     Words = words
                 };
             });

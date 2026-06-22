@@ -340,6 +340,7 @@ namespace SpokenEnglishAPI.Controllers
         }
 
         // ── POST /api/admin/import/arrange ────────────────────────────────────
+        // CSV format: LessonId, CorrectSentence, TamilMeaning (optional), Words pipe-separated (optional)
         [HttpPost("import/arrange")]
         [Consumes("multipart/form-data")]
         public async Task<IActionResult> ImportArrange(IFormFile file)
@@ -364,19 +365,23 @@ namespace SpokenEnglishAPI.Controllers
                     var sentence = cols[1].Trim();
                     if (string.IsNullOrWhiteSpace(sentence)) { skipped++; continue; }
 
-                    var words = sentence.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                    var tamilMeaning = cols.Length >= 3 ? cols[2].Trim() : null;
 
-                    // Insert into arrangesentence
+                    // Words may be pipe-separated in col[3], else split from sentence
+                    string[] words;
+                    if (cols.Length >= 4 && !string.IsNullOrWhiteSpace(cols[3]))
+                        words = cols[3].Split('|', StringSplitOptions.RemoveEmptyEntries);
+                    else
+                        words = sentence.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+
                     var arrId = await con.ExecuteScalarAsync<int>(
                         "INSERT INTO arrangesentence (lessonid) VALUES (@lid) RETURNING arrangesentenceid",
                         new { lid = lessonId });
 
-                    // Insert sentence text
                     await con.ExecuteAsync(
-                        "INSERT INTO arrangesentence_lang (arrangesentenceid, languageid, correctsentence) VALUES (@aid, 1, @s)",
-                        new { aid = arrId, s = sentence });
+                        "INSERT INTO arrangesentence_lang (arrangesentenceid, languageid, correctsentence, tamilmeaning) VALUES (@aid, 1, @s, @tm)",
+                        new { aid = arrId, s = sentence, tm = string.IsNullOrWhiteSpace(tamilMeaning) ? null : tamilMeaning });
 
-                    // Insert each word
                     for (int i = 0; i < words.Length; i++)
                     {
                         var wid = await con.ExecuteScalarAsync<int>(
@@ -391,6 +396,20 @@ namespace SpokenEnglishAPI.Controllers
                 catch { skipped++; }
             }
             return Ok(new { imported, skipped, message = $"Imported {imported} sentences, skipped {skipped}" });
+        }
+
+        // ── POST /api/admin/users/{id}/password ──────────────────────────────
+        [HttpPost("users/{id}/password")]
+        public async Task<IActionResult> ResetPassword(int id, [FromBody] AdminResetPasswordDto dto)
+        {
+            if (string.IsNullOrWhiteSpace(dto.NewPassword) || dto.NewPassword.Length < 6)
+                return BadRequest(new { message = "Password must be at least 6 characters" });
+            using var con = _db.CreateConnection();
+            var exists = await con.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM users WHERE id=@id", new { id });
+            if (exists == 0) return NotFound(new { message = "User not found" });
+            var hash = BCrypt.Net.BCrypt.HashPassword(dto.NewPassword);
+            await con.ExecuteAsync("UPDATE users SET passwordhash=@hash, modifydate=NOW() WHERE id=@id", new { hash, id });
+            return Ok(new { message = "Password updated" });
         }
 
         // ── GET /api/admin/lesson-stats ───────────────────────────────────────
@@ -971,6 +990,7 @@ namespace SpokenEnglishAPI.Controllers
     }
 
     public record RoleDto(string Role);
+    public record AdminResetPasswordDto(string NewPassword);
     public record PremiumDto(bool IsPremium);
     public record GrantAccessDto(bool Grant);
     public record CreateUserAdminDto(string Email, string Mobile, string Password, string? Role);

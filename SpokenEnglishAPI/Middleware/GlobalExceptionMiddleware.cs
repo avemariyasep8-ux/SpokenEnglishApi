@@ -3,8 +3,10 @@ using System.Text.Json;
 
 namespace SpokenEnglishAPI.Middleware
 {
-    public class GlobalExceptionMiddleware(RequestDelegate next, ILogger<GlobalExceptionMiddleware> logger)
+    public class GlobalExceptionMiddleware(RequestDelegate next, ILogger<GlobalExceptionMiddleware> logger, IWebHostEnvironment env)
     {
+        private static readonly string LogDir = Path.Combine(AppContext.BaseDirectory, "logs");
+
         public async Task InvokeAsync(HttpContext ctx)
         {
             try
@@ -14,11 +16,24 @@ namespace SpokenEnglishAPI.Middleware
             catch (Exception ex)
             {
                 logger.LogError(ex, "Unhandled exception on {Method} {Path}", ctx.Request.Method, ctx.Request.Path);
+                WriteToFile(ctx, ex);
                 await WriteError(ctx, ex);
             }
         }
 
-        private static async Task WriteError(HttpContext ctx, Exception ex)
+        private static void WriteToFile(HttpContext ctx, Exception ex)
+        {
+            try
+            {
+                Directory.CreateDirectory(LogDir);
+                var logFile = Path.Combine(LogDir, $"api_errors_{DateTime.UtcNow:yyyy-MM-dd}.log");
+                var entry = $"[{DateTime.UtcNow:O}] {ctx.Request.Method} {ctx.Request.Path} | {ex.GetType().Name}: {ex.Message}{Environment.NewLine}{ex.StackTrace}{Environment.NewLine}---{Environment.NewLine}";
+                File.AppendAllText(logFile, entry);
+            }
+            catch { /* never let logging crash the app */ }
+        }
+
+        private async Task WriteError(HttpContext ctx, Exception ex)
         {
             ctx.Response.ContentType = "application/json";
             var (status, code) = ex switch
@@ -34,9 +49,7 @@ namespace SpokenEnglishAPI.Middleware
             var body = JsonSerializer.Serialize(new
             {
                 error = code,
-                message = ctx.RequestServices.GetRequiredService<IWebHostEnvironment>().IsDevelopment()
-                    ? ex.Message
-                    : "An unexpected error occurred. Please try again.",
+                message = env.IsDevelopment() ? ex.Message : "An unexpected error occurred. Please try again.",
                 traceId = ctx.TraceIdentifier
             });
             await ctx.Response.WriteAsync(body);

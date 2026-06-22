@@ -139,6 +139,7 @@ namespace SpokenEnglishAPI.Domain.DTOs
     {
         public int ArrangeSentenceID { get; set; }
         public string CorrectSentence { get; set; } = string.Empty;
+        public string? TamilMeaning { get; set; }
         public List<ArrangeWordDto> Words { get; set; } = new();
     }
 
