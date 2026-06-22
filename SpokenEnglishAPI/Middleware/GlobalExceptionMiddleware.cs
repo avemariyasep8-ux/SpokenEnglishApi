@@ -38,10 +38,10 @@ namespace SpokenEnglishAPI.Middleware
             ctx.Response.ContentType = "application/json";
             var (status, code) = ex switch
             {
-                UnauthorizedAccessException => (HttpStatusCode.Forbidden, "FORBIDDEN"),
-                KeyNotFoundException        => (HttpStatusCode.NotFound,  "NOT_FOUND"),
-                ArgumentException           => (HttpStatusCode.BadRequest, "BAD_REQUEST"),
-                InvalidOperationException   => (HttpStatusCode.BadRequest, "INVALID_OPERATION"),
+                UnauthorizedAccessException => (HttpStatusCode.Unauthorized, "UNAUTHORIZED"),
+                KeyNotFoundException        => (HttpStatusCode.NotFound,     "NOT_FOUND"),
+                ArgumentException           => (HttpStatusCode.BadRequest,   "BAD_REQUEST"),
+                InvalidOperationException   => (HttpStatusCode.BadRequest,   "INVALID_OPERATION"),
                 _                           => (HttpStatusCode.InternalServerError, "SERVER_ERROR")
             };
             ctx.Response.StatusCode = (int)status;
@@ -49,7 +49,7 @@ namespace SpokenEnglishAPI.Middleware
             var body = JsonSerializer.Serialize(new
             {
                 error = code,
-                message = env.IsDevelopment() ? ex.Message : "An unexpected error occurred. Please try again.",
+                message = ex.Message,
                 traceId = ctx.TraceIdentifier
             });
             await ctx.Response.WriteAsync(body);

@@ -24,7 +24,10 @@ namespace SpokenEnglishAPI.Controllers
 
         [HttpPost("login")]
         public IActionResult Login(LoginRequestDto dto)
-            => Ok(_authService.Login(dto));
+        {
+            try { return Ok(_authService.Login(dto)); }
+            catch (UnauthorizedAccessException ex) { return Unauthorized(new { message = ex.Message }); }
+        }
 
         [HttpPost("register")]
         [AllowAnonymous]
