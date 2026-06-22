@@ -33,9 +33,10 @@ namespace SpokenEnglishAPI.Controllers
             using var con = _db.CreateConnection();
             var rows = await con.QueryAsync(
                 @"SELECT u.id, u.email, u.mobilenumber, u.role, u.isactive, u.createddate,
-                         us.planname, us.enddate, us.status as substatus
+                         sp.plan_name as planname, us.end_date as enddate, us.status as substatus
                   FROM users u
                   LEFT JOIN user_subscriptions us ON us.user_id = u.id AND us.status='active'
+                  LEFT JOIN subscription_plans sp ON sp.plan_id = us.plan_id
                   ORDER BY u.id DESC LIMIT 200");
             return Ok(rows);
         }
