@@ -27,3 +27,5 @@ jobs:
         run: railway up --service spoken-english-api --detach
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_PROJECT_ID: 4447c47c-a4fc-4597-9844-a2fc6c406c4a
+          RAILWAY_ENVIRONMENT_NAME: production
