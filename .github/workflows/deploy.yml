@@ -1,26 +1,12 @@
 name: Deploy API to Railway
 
+# Railway auto-deploys via native GitHub integration (spoken-english-api service → Settings → Source → GitHub)
+# This workflow is intentionally disabled to avoid duplicate deploys.
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 jobs:
-  deploy:
-    name: Deploy to Railway
+  placeholder:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Railway CLI
-        run: npm install -g @railway/cli@latest
-
-      - name: Link Railway project
-        run: railway link --project 4447c47c-a4fc-4597-9844-a2fc6c406c4a --environment production
-        env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-
-      - name: Deploy to Railway
-        run: railway up --service spoken-english-api --detach
-        env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+      - run: echo "Deploy handled by Railway GitHub integration"
