@@ -1,126 +1,29 @@
-name: Build & Deploy Spoken English App
+name: Deploy API to Railway
 
 on:
   push:
     branches: [main]
-  workflow_dispatch:   # manual trigger from GitHub UI
-
-env:
-  DOTNET_VERSION: '8.0.x'
-  NODE_VERSION: '20.x'
+  workflow_dispatch:
 
 jobs:
-  # ── 1. API Build + Test ────────────────────────────────────────────────────
-  build-api:
-    name: Build & Test API
+  deploy:
+    name: Deploy to Railway
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup .NET
+      - name: Setup .NET (verify build before deploy)
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: ${{ env.DOTNET_VERSION }}
+          dotnet-version: '8.0.x'
 
-      - name: Restore
-        run: dotnet restore SpokenEnglishAPI/SpokenEnglishAPI.csproj
+      - name: Build check
+        run: dotnet build SpokenEnglishAPI/SpokenEnglishAPI.csproj -c Release
 
-      - name: Build
-        run: dotnet build SpokenEnglishAPI/SpokenEnglishAPI.csproj --no-restore -c Release
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
 
-      - name: Test
-        run: dotnet test SpokenEnglishAPI.Tests/SpokenEnglishAPI.Tests.csproj --no-restore -c Release
+      - name: Deploy to Railway
+        run: railway up --service spoken-english-api --detach
         env:
-          ConnectionStrings__DefaultConnection: ${{ secrets.DB_CONNECTION_STRING }}
-
-      - name: Publish
-        run: dotnet publish SpokenEnglishAPI/SpokenEnglishAPI.csproj -c Release -o ./publish
-
-      - name: Upload API artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: api-build
-          path: ./publish
-
-  # ── 2. UI Build ────────────────────────────────────────────────────────────
-  build-ui:
-    name: Build React UI
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-          cache-dependency-path: ui/package-lock.json
-
-      - name: Install
-        run: npm ci
-        working-directory: ui
-
-      - name: Build
-        run: npm run build
-        working-directory: ui
-        env:
-          VITE_API_URL: ${{ secrets.VITE_API_URL }}
-
-      - name: Upload UI artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ui-build
-          path: ui/dist
-
-  # ── 3. Deploy to Railway / Server ─────────────────────────────────────────
-  deploy:
-    name: Deploy
-    needs: [build-api, build-ui]
-    runs-on: ubuntu-latest
-    environment: production
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Download API build
-        uses: actions/download-artifact@v4
-        with:
-          name: api-build
-          path: ./publish
-
-      - name: Download UI build
-        uses: actions/download-artifact@v4
-        with:
-          name: ui-build
-          path: ./ui-dist
-
-      # ── Option A: Deploy to a VPS via SSH ─────────────────────────────────
-      - name: Deploy API to VPS
-        uses: appleboy/ssh-action@v1
-        with:
-          host:     ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key:      ${{ secrets.SSH_PRIVATE_KEY }}
-          script: |
-            # Stop old API
-            sudo systemctl stop spokenenglish-api || true
-
-            # Copy new files
-            sudo cp -r /tmp/api-publish/* /opt/spokenenglish/api/
-
-            # Run DB migrations
-            /opt/spokenenglish/run-migrations.sh
-
-            # Restart API service
-            sudo systemctl start spokenenglish-api
-            sudo systemctl status spokenenglish-api
-
-      - name: Deploy UI to Nginx
-        uses: appleboy/ssh-action@v1
-        with:
-          host:     ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key:      ${{ secrets.SSH_PRIVATE_KEY }}
-          script: |
-            sudo rm -rf /var/www/spokenenglish/*
-            sudo cp -r /tmp/ui-dist/* /var/www/spokenenglish/
-            sudo systemctl reload nginx
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
