@@ -12,7 +12,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup .NET (verify build before deploy)
+      - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
@@ -21,7 +21,7 @@ jobs:
         run: dotnet build SpokenEnglishAPI/SpokenEnglishAPI.csproj -c Release
 
       - name: Install Railway CLI
-        run: npm install -g @railway/cli
+        run: npm install -g @railway/cli@latest
 
       - name: Deploy to Railway
         run: railway up --service spoken-english-api --detach
