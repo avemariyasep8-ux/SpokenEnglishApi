@@ -12,20 +12,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '8.0.x'
-
-      - name: Build check
-        run: dotnet build SpokenEnglishAPI/SpokenEnglishAPI.csproj -c Release
-
       - name: Install Railway CLI
         run: npm install -g @railway/cli@latest
+
+      - name: Link Railway project
+        run: railway link --project 4447c47c-a4fc-4597-9844-a2fc6c406c4a --environment production
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
 
       - name: Deploy to Railway
         run: railway up --service spoken-english-api --detach
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-          RAILWAY_PROJECT_ID: 4447c47c-a4fc-4597-9844-a2fc6c406c4a
-          RAILWAY_ENVIRONMENT_NAME: production
