@@ -1,28 +1,54 @@
-﻿namespace SpokenEnglishAPI.Domain.DTOs
+using System.ComponentModel.DataAnnotations;
+
+namespace SpokenEnglishAPI.Domain.DTOs
 {
     public class RegisterUserRequestDto
     {
-        public string Email { get; set; }
-        public string Password { get; set; }
-        public string mobnumber { get; set; }
+        [Required]
+        [EmailAddress]
+        [MaxLength(200)]
+        public string Email { get; set; } = "";
+
+        [Required]
+        [MinLength(6)]
+        [MaxLength(128)]
+        public string Password { get; set; } = "";
+
+        [Required]
+        [RegularExpression(@"^\d{10,15}$", ErrorMessage = "Mobile must be 10–15 digits.")]
+        public string mobnumber { get; set; } = "";
+
+        [MaxLength(200)]
         public string? FullName { get; set; }
+
+        [Range(1, int.MaxValue)]
         public int? SchoolId { get; set; }
-        public string? SchoolRole { get; set; } // Student | Teacher | Headmaster
+
+        // Restrict role to known values
+        [RegularExpression("^(Student|Teacher|Headmaster)$", ErrorMessage = "Invalid school role.")]
+        public string? SchoolRole { get; set; }
+
+        [MaxLength(50)]
         public string? ClassName { get; set; }
     }
 
     public class RegisterUserResponseDto
     {
-        public string Email { get; set; }
-        public string ApiKey { get; set; }
-        public string mobnumber { get; set; }
-        public string Message { get; set; }
+        public string Email { get; set; } = "";
+        public string ApiKey { get; set; } = "";
+        public string mobnumber { get; set; } = "";
+        public string Message { get; set; } = "";
     }
 
     public class ResetPasswordDto
     {
-        public string EmailOrMobile { get; set; }
-        public string NewPassword { get; set; }
+        [Required]
+        [MaxLength(200)]
+        public string EmailOrMobile { get; set; } = "";
+
+        [Required]
+        [MinLength(6)]
+        [MaxLength(128)]
+        public string NewPassword { get; set; } = "";
     }
- 
 }

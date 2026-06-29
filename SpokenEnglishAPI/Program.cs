@@ -3,6 +3,8 @@ using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.IdentityModel.Tokens;
+using NLog;
+using NLog.Web;
 using SpokenEnglishAPI.Application.Implementation;
 using SpokenEnglishAPI.Application.Interfaces;
 using SpokenEnglishAPI.Application.Services;
@@ -17,7 +19,15 @@ namespace SpokenEnglishAPI
     {
         public static void Main(string[] args)
         {
+            // Bootstrap NLog before the host builds so early startup errors are captured
+            var logger = LogManager.Setup().LoadConfigurationFromFile("nlog.config").GetCurrentClassLogger();
+            logger.Info("SpokenEnglish API starting");
+
             var builder = WebApplication.CreateBuilder(args);
+
+            // Use NLog as the .NET ILogger provider
+            builder.Logging.ClearProviders();
+            builder.Host.UseNLog();
 
             // Railway provides DATABASE_URL as postgres:// URI — convert to Npgsql format
             var railwayDb = Environment.GetEnvironmentVariable("DATABASE_URL");
@@ -119,6 +129,9 @@ namespace SpokenEnglishAPI
             builder.Services.AddScoped<WordContentRepository>();
             builder.Services.AddScoped<SubscriptionRepository>();
             builder.Services.AddScoped<StreakRepository>();
+
+            // Email alert service (exception notifications)
+            builder.Services.AddSingleton<IEmailAlertService, EmailAlertService>();
 
             // ---------------------------------
             // JWT CONFIG

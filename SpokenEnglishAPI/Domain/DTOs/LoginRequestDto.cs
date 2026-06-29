@@ -1,10 +1,15 @@
-﻿namespace SpokenEnglishAPI.Domain.DTOs
+using System.ComponentModel.DataAnnotations;
+
+namespace SpokenEnglishAPI.Domain.DTOs
 {
     public class LoginRequestDto
     {
-        public string EmailOrMob { get; set; }
-        public string Password { get; set; }
+        [Required]
+        [MaxLength(200)]
+        public string EmailOrMob { get; set; } = "";
+
+        [Required]
+        [MaxLength(128)]
+        public string Password { get; set; } = "";
     }
-
-
 }

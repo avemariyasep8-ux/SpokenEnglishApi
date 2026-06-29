@@ -1,58 +1,82 @@
 using System.Net;
 using System.Text.Json;
+using NLog;
+using SpokenEnglishAPI.Application.Services;
 
 namespace SpokenEnglishAPI.Middleware
 {
-    public class GlobalExceptionMiddleware(RequestDelegate next, ILogger<GlobalExceptionMiddleware> logger, IWebHostEnvironment env)
+    public class GlobalExceptionMiddleware
     {
-        private static readonly string LogDir = Path.Combine(AppContext.BaseDirectory, "logs");
+        private static readonly Logger _nlog = LogManager.GetCurrentClassLogger();
+
+        private readonly RequestDelegate _next;
+        private readonly IEmailAlertService _email;
+
+        public GlobalExceptionMiddleware(RequestDelegate next, IEmailAlertService email)
+        {
+            _next  = next;
+            _email = email;
+        }
 
         public async Task InvokeAsync(HttpContext ctx)
         {
             try
             {
-                await next(ctx);
+                await _next(ctx);
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Unhandled exception on {Method} {Path}", ctx.Request.Method, ctx.Request.Path);
-                WriteToFile(ctx, ex);
-                await WriteError(ctx, ex);
+                await HandleAsync(ctx, ex);
             }
         }
 
-        private static void WriteToFile(HttpContext ctx, Exception ex)
+        private async Task HandleAsync(HttpContext ctx, Exception ex)
         {
-            try
+            var method  = ctx.Request.Method;
+            var path    = ctx.Request.Path;
+            var traceId = ctx.TraceIdentifier;
+
+            // NLog structured log
+            _nlog.Error(ex, "Unhandled exception | TraceId={TraceId} | {Method} {Path}", traceId, method, path);
+
+            // Send email alert asynchronously (fire-and-forget so it never blocks the response)
+            _ = Task.Run(async () =>
             {
-                Directory.CreateDirectory(LogDir);
-                var logFile = Path.Combine(LogDir, $"api_errors_{DateTime.UtcNow:yyyy-MM-dd}.log");
-                var entry = $"[{DateTime.UtcNow:O}] {ctx.Request.Method} {ctx.Request.Path} | {ex.GetType().Name}: {ex.Message}{Environment.NewLine}{ex.StackTrace}{Environment.NewLine}---{Environment.NewLine}";
-                File.AppendAllText(logFile, entry);
-            }
-            catch { /* never let logging crash the app */ }
-        }
+                var subject = $"{ex.GetType().Name} on {method} {path}";
+                var body    = $"""
+                    TraceId  : {traceId}
+                    Time     : {DateTime.UtcNow:O}
+                    Request  : {method} {path}
+                    Exception: {ex.GetType().FullName}
+                    Message  : {ex.Message}
 
-        private async Task WriteError(HttpContext ctx, Exception ex)
-        {
+                    Stack Trace:
+                    {ex.StackTrace}
+
+                    Inner Exception:
+                    {ex.InnerException?.ToString() ?? "(none)"}
+                    """;
+                await _email.SendExceptionAlertAsync(subject, body);
+            });
+
             ctx.Response.ContentType = "application/json";
             var (status, code) = ex switch
             {
-                UnauthorizedAccessException => (HttpStatusCode.Unauthorized, "UNAUTHORIZED"),
-                KeyNotFoundException        => (HttpStatusCode.NotFound,     "NOT_FOUND"),
-                ArgumentException           => (HttpStatusCode.BadRequest,   "BAD_REQUEST"),
-                InvalidOperationException   => (HttpStatusCode.BadRequest,   "INVALID_OPERATION"),
-                _                           => (HttpStatusCode.InternalServerError, "SERVER_ERROR")
+                UnauthorizedAccessException => (HttpStatusCode.Unauthorized,     "UNAUTHORIZED"),
+                KeyNotFoundException        => (HttpStatusCode.NotFound,         "NOT_FOUND"),
+                ArgumentException           => (HttpStatusCode.BadRequest,       "BAD_REQUEST"),
+                InvalidOperationException   => (HttpStatusCode.BadRequest,       "INVALID_OPERATION"),
+                _                           => (HttpStatusCode.InternalServerError, "SERVER_ERROR"),
             };
             ctx.Response.StatusCode = (int)status;
 
-            var body = JsonSerializer.Serialize(new
+            var body2 = JsonSerializer.Serialize(new
             {
-                error = code,
+                error   = code,
                 message = ex.Message,
-                traceId = ctx.TraceIdentifier
+                traceId,
             });
-            await ctx.Response.WriteAsync(body);
+            await ctx.Response.WriteAsync(body2);
         }
     }
 }

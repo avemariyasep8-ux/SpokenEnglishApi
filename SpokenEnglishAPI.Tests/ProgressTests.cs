@@ -19,7 +19,7 @@ public class ProgressTests
     public ProgressTests()
     {
         _mockProgress = new Mock<IProgressService>();
-        _controller   = new ProgressController(_mockProgress.Object);
+        _controller   = new ProgressController(_mockProgress.Object, null!);
     }
 
     // ── SaveAnswer ────────────────────────────────────────────────────────────
