@@ -67,6 +67,7 @@ namespace SpokenEnglishAPI.Domain.DTOs
         public int LessonOrder { get; set; }
         public bool IsActive { get; set; }
         public bool IsPremium { get; set; }
+        public string Level { get; set; } = "Beginner";
     }
 
     public class AddLessonDto

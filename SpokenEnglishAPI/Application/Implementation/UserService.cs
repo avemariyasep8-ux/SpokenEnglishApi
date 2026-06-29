@@ -1,5 +1,7 @@
-﻿using SpokenEnglishAPI.Application.Interfaces;
+using Dapper;
+using SpokenEnglishAPI.Application.Interfaces;
 using SpokenEnglishAPI.Domain.DTOs;
+using SpokenEnglishAPI.Infrastructure.Data;
 using SpokenEnglishAPI.Infrastructure.Repositories;
 
 namespace SpokenEnglishAPI.Application.Implementation;
@@ -7,10 +9,12 @@ namespace SpokenEnglishAPI.Application.Implementation;
 public class UserService : IUserService
 {
     private readonly UserRepository _userRepository;
+    private readonly DbContext _db;
 
-    public UserService(UserRepository userRepository)
+    public UserService(UserRepository userRepository, DbContext db)
     {
         _userRepository = userRepository;
+        _db = db;
     }
 
     public RegisterUserResponseDto Register(RegisterUserRequestDto dto)
@@ -19,6 +23,26 @@ public class UserService : IUserService
         var apiKey = Guid.NewGuid().ToString("N");
 
         _userRepository.CreateUser(dto.Email, passwordHash, apiKey);
+
+        // Set full_name and school_role on the newly created user
+        if (!string.IsNullOrEmpty(dto.FullName) || dto.SchoolId.HasValue)
+        {
+            using var con = _db.CreateConnection();
+            con.Execute(
+                "UPDATE users SET full_name=@fn, school_id=@sid, school_role=@sr WHERE email=@email",
+                new { fn = dto.FullName, sid = dto.SchoolId, sr = dto.SchoolRole, email = dto.Email });
+
+            // If school selected, add to school_users pending approval
+            if (dto.SchoolId.HasValue && !string.IsNullOrEmpty(dto.SchoolRole))
+            {
+                var userId = con.ExecuteScalar<int>("SELECT id FROM users WHERE email=@email", new { email = dto.Email });
+                con.Execute(
+                    @"INSERT INTO school_users (school_id, user_id, school_role, class_name, is_approved)
+                      VALUES (@sid, @uid, @role, @cls, false)
+                      ON CONFLICT (school_id, user_id) DO NOTHING",
+                    new { sid = dto.SchoolId, uid = userId, role = dto.SchoolRole, cls = dto.ClassName });
+            }
+        }
 
         return new RegisterUserResponseDto
         {
@@ -32,12 +56,8 @@ public class UserService : IUserService
     public void ResetPassword(ResetPasswordDto dto)
     {
         var user = _userRepository.GetByEmail(dto.EmailOrMobile);
-
-        if (user == null)
-            throw new Exception("User not found");
-
+        if (user == null) throw new Exception("User not found");
         var newHash = BCrypt.Net.BCrypt.HashPassword(dto.NewPassword);
-
         _userRepository.UpdatePassword(user.ID, newHash);
     }
 }
