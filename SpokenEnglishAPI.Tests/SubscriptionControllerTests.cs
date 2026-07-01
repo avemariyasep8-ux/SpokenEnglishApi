@@ -1,4 +1,6 @@
+using System.Security.Claims;
 using FluentAssertions;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Moq;
 using SpokenEnglishAPI.Controllers;
@@ -16,6 +18,17 @@ public class SubscriptionControllerTests
     {
         _mockRepo   = new Mock<SubscriptionRepository>(null!);
         _controller = new SubscriptionController(_mockRepo.Object);
+
+        // Admin principal so the ownership guard passes in unit tests.
+        var identity = new ClaimsIdentity(new[]
+        {
+            new Claim(ClaimTypes.Role, "Admin"),
+            new Claim("uid", "1"),
+        }, "TestAuth");
+        _controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(identity) }
+        };
     }
 
     [Fact]

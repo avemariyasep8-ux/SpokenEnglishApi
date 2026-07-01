@@ -133,15 +133,28 @@ namespace SpokenEnglishAPI
             // Email alert service (exception notifications)
             builder.Services.AddSingleton<IEmailAlertService, EmailAlertService>();
 
+            // Audit logging (login/register/admin actions)
+            builder.Services.AddScoped<IAuditLogService, AuditLogService>();
+
             // ---------------------------------
             // JWT CONFIG
             // ---------------------------------
-            var jwtKey = builder.Configuration["Jwt:Key"];
+            // Prefer the JWT_KEY environment variable (set in Railway) over the value in
+            // appsettings.json so the signing secret is never shipped in source control.
+            var jwtKey = Environment.GetEnvironmentVariable("JWT_KEY");
+            if (string.IsNullOrWhiteSpace(jwtKey))
+                jwtKey = builder.Configuration["Jwt:Key"];
+            // Make the resolved key available to JwtTokenGenerator (which reads Jwt:Key).
+            builder.Configuration["Jwt:Key"] = jwtKey;
+
             var jwtIssuer = builder.Configuration["Jwt:Issuer"];
             var jwtAudience = builder.Configuration["Jwt:Audience"];
 
             if (string.IsNullOrWhiteSpace(jwtKey))
                 throw new InvalidOperationException("Jwt:Key is missing in appsettings.json");
+            // Warn loudly if a weak/short signing key is in use — HMAC-SHA256 needs >= 32 bytes.
+            if (jwtKey.Length < 32 || jwtKey.Contains("SUPER_LONG_SECRET_KEY"))
+                logger.Warn("WEAK JWT SIGNING KEY in use. Set a strong JWT_KEY env var (>= 32 random chars) in production.");
             if (string.IsNullOrWhiteSpace(jwtIssuer))
                 throw new InvalidOperationException("Jwt:Issuer is missing in appsettings.json");
             if (string.IsNullOrWhiteSpace(jwtAudience))
@@ -220,6 +233,9 @@ namespace SpokenEnglishAPI
 
             // Rate limiting before CORS/auth
             app.UseRateLimiter();
+
+            // Stricter brute-force throttle for auth endpoints
+            app.UseMiddleware<RateLimitMiddleware>();
 
             // CORS must come before Auth
             app.UseCors("ReactPolicy");

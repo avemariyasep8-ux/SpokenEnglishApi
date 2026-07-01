@@ -446,6 +446,23 @@ namespace SpokenEnglishAPI.Controllers
             return Ok(stats);
         }
 
+        // ── GET /api/admin/audit-log ──────────────────────────────────────
+        // View recent security audit events (login/register/etc.). Admin only.
+        [HttpGet("audit-log")]
+        public async Task<IActionResult> GetAuditLog([FromQuery] int limit = 200, [FromQuery] string? action = null)
+        {
+            if (limit < 1 || limit > 1000) limit = 200;
+            using var con = _db.CreateConnection();
+            var rows = await con.QueryAsync(
+                @"SELECT id, user_id, email, action, ip_address, user_agent, success, detail, created_at
+                  FROM audit_log
+                  WHERE (@action IS NULL OR action = @action)
+                  ORDER BY created_at DESC
+                  LIMIT @limit",
+                new { action, limit });
+            return Ok(rows);
+        }
+
         private static string[] ParseCsvLine(string line)
         {
             var result = new List<string>();

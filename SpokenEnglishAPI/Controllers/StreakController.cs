@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SpokenEnglishAPI.Domain.DTOs;
 using SpokenEnglishAPI.Infrastructure.Repositories;
+using SpokenEnglishAPI.Infrastructure.Security;
 
 namespace SpokenEnglishAPI.Controllers
 {
@@ -16,6 +17,7 @@ namespace SpokenEnglishAPI.Controllers
         [HttpGet("{userId}")]
         public async Task<IActionResult> Get(int userId)
         {
+            if (!OwnershipGuard.CanAccess(User, userId)) return Forbid();
             var streak = await _repo.GetStreak(userId);
             return Ok(streak ?? new UserStreakDto());
         }
@@ -23,6 +25,7 @@ namespace SpokenEnglishAPI.Controllers
         [HttpPost("update")]
         public async Task<IActionResult> Update([FromBody] UpdateStreakDto dto)
         {
+            if (!OwnershipGuard.CanAccess(User, dto.UserId)) return Forbid();
             var streak = await _repo.UpdateStreak(dto.UserId, dto.XpEarned);
             return Ok(streak);
         }

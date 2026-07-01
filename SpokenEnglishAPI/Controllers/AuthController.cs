@@ -14,26 +14,43 @@ namespace SpokenEnglishAPI.Controllers
 
         private readonly IUserService _userService;
 
-        public AuthController(IAuthService authService, IUserService userService)
+        private readonly IAuditLogService _audit;
+
+        public AuthController(IAuthService authService, IUserService userService, IAuditLogService audit)
         {
             _authService = authService;
             _userService = userService;
+            _audit = audit;
         }
 
+        private string? ClientIp() =>
+            HttpContext.Connection.RemoteIpAddress?.ToString();
 
+        private string? UserAgent() =>
+            Request.Headers.TryGetValue("User-Agent", out var ua) ? ua.ToString() : null;
 
         [HttpPost("login")]
-        public IActionResult Login(LoginRequestDto dto)
+        public async Task<IActionResult> Login(LoginRequestDto dto)
         {
-            try { return Ok(_authService.Login(dto)); }
-            catch (UnauthorizedAccessException ex) { return Unauthorized(new { message = ex.Message }); }
+            try
+            {
+                var result = _authService.Login(dto);
+                await _audit.LogAsync("LOGIN_SUCCESS", result.UserID, result.Email, ClientIp(), UserAgent(), true);
+                return Ok(result);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                await _audit.LogAsync("LOGIN_FAILURE", null, dto.EmailOrMob, ClientIp(), UserAgent(), false, ex.Message);
+                return Unauthorized(new { message = ex.Message });
+            }
         }
 
         [HttpPost("register")]
         [AllowAnonymous]
-        public IActionResult Register(RegisterUserRequestDto dto)
+        public async Task<IActionResult> Register(RegisterUserRequestDto dto)
         {
             var result = _userService.Register(dto);
+            await _audit.LogAsync("REGISTER", null, dto.Email, ClientIp(), UserAgent(), true);
             return Ok(result);
         }
 

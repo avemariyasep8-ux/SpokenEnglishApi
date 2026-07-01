@@ -1,4 +1,6 @@
+using System.Security.Claims;
 using FluentAssertions;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Moq;
 using SpokenEnglishAPI.Application.Interfaces;
@@ -20,6 +22,18 @@ public class ProgressTests
     {
         _mockProgress = new Mock<IProgressService>();
         _controller   = new ProgressController(_mockProgress.Object, null!);
+
+        // Provide an authenticated Admin principal so the ownership guard passes
+        // (Admins may act on any userId).
+        var identity = new ClaimsIdentity(new[]
+        {
+            new Claim(ClaimTypes.Role, "Admin"),
+            new Claim("uid", "1"),
+        }, "TestAuth");
+        _controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(identity) }
+        };
     }
 
     // ── SaveAnswer ────────────────────────────────────────────────────────────

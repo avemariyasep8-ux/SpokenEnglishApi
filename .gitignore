@@ -4,3 +4,8 @@ obj/
 *.user
 appsettings.Development.json
 *.log
+
+# Local dev secrets (contains DB connection string) — never commit
+**/appsettings.Development.json
+arrange_data.sql
+cleanup.sql

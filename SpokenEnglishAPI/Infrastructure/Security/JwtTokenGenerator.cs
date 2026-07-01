@@ -1,6 +1,5 @@
 using Microsoft.IdentityModel.Tokens;
 using SpokenEnglishAPI.Domain.Entities;
-using SpokenEnglishAPI.Domain.Entities;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
@@ -41,7 +40,8 @@ public class JwtTokenGenerator
         var claims = new[]
         {
             new Claim(JwtRegisteredClaimNames.Sub, user.UserGuid.ToString()),
-            new Claim(ClaimTypes.Role, user.Role),
+            new Claim("uid", user.ID.ToString()),   // integer id for ownership checks (IDOR guard)
+            new Claim(ClaimTypes.Role, user.Role ?? "User"),
             new Claim(JwtRegisteredClaimNames.Email, user.Email ?? "")
         };
 

@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SpokenEnglishAPI.Domain.DTOs;
 using SpokenEnglishAPI.Infrastructure.Repositories;
+using SpokenEnglishAPI.Infrastructure.Security;
 
 namespace SpokenEnglishAPI.Controllers
 {
@@ -23,6 +24,7 @@ namespace SpokenEnglishAPI.Controllers
         [Authorize]
         public async Task<IActionResult> Subscribe([FromBody] SubscribeRequestDto dto)
         {
+            if (!OwnershipGuard.CanAccess(User, dto.UserId)) return Forbid();
             var id = await _repo.Subscribe(dto);
             return Ok(new { SubscriptionId = id, Message = "Subscription activated successfully!" });
         }
@@ -31,6 +33,7 @@ namespace SpokenEnglishAPI.Controllers
         [Authorize]
         public async Task<IActionResult> GetMySubscription(int userId)
         {
+            if (!OwnershipGuard.CanAccess(User, userId)) return Forbid();
             var sub = await _repo.GetUserSubscription(userId);
             if (sub == null) return Ok(new { Status = "none" });
             return Ok(sub);
