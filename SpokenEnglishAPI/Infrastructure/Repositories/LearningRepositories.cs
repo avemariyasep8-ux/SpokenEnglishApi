@@ -152,6 +152,23 @@ namespace SpokenEnglishAPI.Infrastructure.Repositories
                 };
             });
         }
+
+        public async Task<int> AddSentence(int lessonId, int languageId, string correctSentence)
+        {
+            using var con = _context.CreateConnection();
+            return await con.ExecuteScalarAsync<int>(
+                @"INSERT INTO arrangesentence (lessonid) VALUES (@lid) RETURNING arrangesentenceid;",
+                new { lid = lessonId });
+        }
+
+        public async Task AddWord(int sentenceId, int languageId, string wordText, int correctOrder)
+        {
+            using var con = _context.CreateConnection();
+            await con.ExecuteAsync(
+                @"INSERT INTO arrangeword (arrangesentenceid, wordtext, correctorder, languageid)
+                  VALUES (@sid, @word, @order, @lang)",
+                new { sid = sentenceId, word = wordText, order = correctOrder, lang = languageId });
+        }
     }
 
     public class ReadingRepository
