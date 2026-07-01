@@ -121,6 +121,26 @@ namespace SpokenEnglishAPI.Controllers
             return File(System.Text.Encoding.UTF8.GetBytes(csv), "text/csv", "mcq.csv");
         }
 
+        // ── GET /api/admin/export/arrange ────────────────────────────────────
+        [HttpGet("export/arrange")]
+        public async Task<IActionResult> ExportArrange()
+        {
+            using var con = _db.CreateConnection();
+            var rows = await con.QueryAsync(
+                @"SELECT a.arrangesentenceid, a.lessonid, ll.lessonname,
+                         al.correctsentence, al.tamilmeaning
+                  FROM arrangesentence a
+                  JOIN arrangesentence_lang al ON al.arrangesentenceid=a.arrangesentenceid AND al.languageid=1
+                  JOIN lesson_lang ll ON ll.lessonid=a.lessonid AND ll.languageid=1
+                  ORDER BY a.lessonid, a.arrangesentenceid");
+
+            var csv = "ArrangeSentenceId,LessonId,LessonName,CorrectSentence,TamilMeaning\n" +
+                string.Join("\n", rows.Select(r =>
+                    $"{r.arrangesentenceid},{r.lessonid},\"{r.lessonname}\",\"{r.correctsentence}\",\"{r.tamilmeaning}\""));
+
+            return File(System.Text.Encoding.UTF8.GetBytes(csv), "text/csv", "arrange_sentences.csv");
+        }
+
         // ── POST /api/admin/import/wordcontent ───────────────────────────────
         // Template format (7 cols): LessonId, WordName, SentencePattern, DefinitionEn, DefinitionTa, ExampleEn, ExampleTa
         // Export format (10 cols):  ContentId, LessonId, LessonName, WordName, SentencePattern, DefinitionEn, DefinitionTa, ExampleEn, ExampleTa, DisplayOrder
@@ -222,9 +242,9 @@ namespace SpokenEnglishAPI.Controllers
                     "1,She ___ a student.,is,are,am,be,1\n" +
                     "1,The sky ___ blue.,are,is,am,were,2\n",
                 "arrange" =>
-                    "LessonId,Sentence,HintText\n" +
-                    "1,She is happy.,Subject + is + Adjective\n" +
-                    "1,He is a teacher.,Subject + is + a + Noun\n",
+                    "LessonId,CorrectSentence,TamilMeaning\n" +
+                    "1,She is happy.,அவள் மகிழ்ச்சியாக இருக்கிறாள்.\n" +
+                    "1,He is a teacher.,அவர் ஒரு ஆசிரியர்.\n",
                 _ => null
             };
             if (csv == null) return NotFound("Unknown template type");
@@ -786,8 +806,8 @@ namespace SpokenEnglishAPI.Controllers
                 "INSERT INTO arrangesentence (lessonid) VALUES (@lid) RETURNING arrangesentenceid",
                 new { lid = dto.LessonId });
             await con.ExecuteAsync(
-                "INSERT INTO arrangesentence_lang (arrangesentenceid, languageid, correctsentence) VALUES (@aid, 1, @s)",
-                new { aid, s = dto.CorrectSentence });
+                "INSERT INTO arrangesentence_lang (arrangesentenceid, languageid, correctsentence, tamilmeaning) VALUES (@aid, 1, @s, @tm)",
+                new { aid, s = dto.CorrectSentence, tm = string.IsNullOrWhiteSpace(dto.TamilMeaning) ? null : dto.TamilMeaning });
             var words = dto.CorrectSentence.Split(' ', StringSplitOptions.RemoveEmptyEntries);
             for (int i = 0; i < words.Length; i++)
             {
@@ -910,11 +930,12 @@ namespace SpokenEnglishAPI.Controllers
         {
             using var con = _db.CreateConnection();
             var lessons = await con.QueryAsync(
-                @"SELECT l.lessonid, ll.lessonname, ll.description, l.lessonorder, l.isactive, l.is_premium,
+                @"SELECT l.lessonid, ll.lessonname, ll.description, l.lessonorder, l.isactive, l.is_premium, l.level,
                          (SELECT COUNT(*) FROM lesson_word_content wc WHERE wc.lesson_id=l.lessonid) as word_count,
                          (SELECT COUNT(*) FROM meaningquestion mq WHERE mq.lessonid=l.lessonid) as mcq_count,
                          (SELECT COUNT(*) FROM fillinblank fb WHERE fb.lessonid=l.lessonid) as fillin_count,
-                         (SELECT COUNT(*) FROM arrangesentence ar WHERE ar.lessonid=l.lessonid) as arrange_count
+                         (SELECT COUNT(*) FROM arrangesentence ar WHERE ar.lessonid=l.lessonid) as arrange_count,
+                         (SELECT COUNT(*) FROM arrangesentence a JOIN arrangesentence_lang al ON al.arrangesentenceid=a.arrangesentenceid AND al.languageid=1 WHERE a.lessonid=l.lessonid AND al.tamilmeaning IS NOT NULL AND al.tamilmeaning != '') as translate_count
                   FROM lesson l
                   JOIN lesson_lang ll ON ll.lessonid=l.lessonid AND ll.languageid=1
                   ORDER BY l.lessonorder");
@@ -927,9 +948,10 @@ namespace SpokenEnglishAPI.Controllers
         {
             using var con = _db.CreateConnection();
             var maxOrder = await con.ExecuteScalarAsync<int>("SELECT COALESCE(MAX(lessonorder),0) FROM lesson") + 1;
+            var level = string.IsNullOrWhiteSpace(dto.Level) ? "Beginner" : dto.Level;
             var lid = await con.ExecuteScalarAsync<int>(
-                "INSERT INTO lesson (lessontypeid, lessonorder, isactive, is_premium) VALUES (1, @ord, true, @prem) RETURNING lessonid",
-                new { ord = dto.LessonOrder ?? maxOrder, prem = dto.IsPremium });
+                "INSERT INTO lesson (lessontypeid, lessonorder, isactive, is_premium, level) VALUES (1, @ord, true, @prem, @lvl) RETURNING lessonid",
+                new { ord = dto.LessonOrder ?? maxOrder, prem = dto.IsPremium, lvl = level });
             await con.ExecuteAsync(
                 "INSERT INTO lesson_lang (lessonid, languageid, lessonname, description) VALUES (@lid, 1, @name, @desc)",
                 new { lid, name = dto.LessonName, desc = dto.Description });
@@ -941,9 +963,10 @@ namespace SpokenEnglishAPI.Controllers
         public async Task<IActionResult> UpdateLesson(int id, [FromBody] CreateLessonDto dto)
         {
             using var con = _db.CreateConnection();
+            var lvl = string.IsNullOrWhiteSpace(dto.Level) ? "Beginner" : dto.Level;
             await con.ExecuteAsync(
-                "UPDATE lesson SET lessonorder=@ord, isactive=@active, is_premium=@prem WHERE lessonid=@id",
-                new { ord = dto.LessonOrder, active = dto.IsActive, prem = dto.IsPremium, id });
+                "UPDATE lesson SET lessonorder=@ord, isactive=@active, is_premium=@prem, level=@lvl WHERE lessonid=@id",
+                new { ord = dto.LessonOrder, active = dto.IsActive, prem = dto.IsPremium, lvl, id });
             await con.ExecuteAsync(
                 "UPDATE lesson_lang SET lessonname=@name, description=@desc WHERE lessonid=@id AND languageid=1",
                 new { name = dto.LessonName, desc = dto.Description, id });
@@ -999,8 +1022,8 @@ namespace SpokenEnglishAPI.Controllers
     public record McqOptionDto(string OptionText, bool IsCorrect);
     public record McqDto(int LessonId, string QuestionText, List<McqOptionDto> Options);
     public record FillInDto(int LessonId, string SentenceWithBlank, string CorrectAnswer, string? Option1, string? Option2, string? Option3, string? HintTa, int DisplayOrder);
-    public record ArrangeDto(int LessonId, string CorrectSentence);
-    public record CreateLessonDto(string LessonName, string? Description, int? LessonOrder, bool IsActive, bool IsPremium);
+    public record ArrangeDto(int LessonId, string CorrectSentence, string? TamilMeaning);
+    public record CreateLessonDto(string LessonName, string? Description, int? LessonOrder, bool IsActive, bool IsPremium, string? Level);
     public record LessonAccessDto(int LessonId, bool HasAccess);
     public record UpsertProgressDto(int UserId, int LessonId, bool IsCompleted, DateTime? CompletedDate, int TimeSpentSeconds, int CorrectAnswers, int WrongAnswers, int TotalAttempts);
 

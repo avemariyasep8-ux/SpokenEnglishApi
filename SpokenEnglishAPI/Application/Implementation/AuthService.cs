@@ -36,7 +36,8 @@ public class AuthService : IAuthService
             Token = token,
             RefreshToken = refresh,
             ApiKey = user.ApiKey,
-            Role = user.Role
+            Role = user.Role,
+            Level = user.Level ?? "Beginner"
         };
     }
 

@@ -30,6 +30,10 @@ namespace SpokenEnglishAPI.Domain.DTOs
 
         [MaxLength(50)]
         public string? ClassName { get; set; }
+
+        [RegularExpression("^(Beginner|Elementary|Intermediate|College|Professional)$", ErrorMessage = "Invalid level.")]
+        [MaxLength(50)]
+        public string? Level { get; set; }
     }
 
     public class RegisterUserResponseDto

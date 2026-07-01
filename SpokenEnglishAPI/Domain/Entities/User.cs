@@ -17,7 +17,8 @@
         public string Mobile { get; set; }
         public string PasswordHash { get; set; }
         public string ApiKey { get; set; }
-        public string Role { get; set; }   // ✅ ADD THIS
+        public string Role { get; set; }
+        public string Level { get; set; }
         public bool IsActive { get; set; }
     }
 

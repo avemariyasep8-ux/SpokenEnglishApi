@@ -24,13 +24,14 @@ public class UserService : IUserService
 
         _userRepository.CreateUser(dto.Email, passwordHash, apiKey);
 
-        // Set full_name and school_role on the newly created user
-        if (!string.IsNullOrEmpty(dto.FullName) || dto.SchoolId.HasValue)
+        // Set full_name, level, and school_role on the newly created user
+        if (!string.IsNullOrEmpty(dto.FullName) || dto.SchoolId.HasValue || !string.IsNullOrEmpty(dto.Level))
         {
             using var con = _db.CreateConnection();
+            var level = string.IsNullOrWhiteSpace(dto.Level) ? "Beginner" : dto.Level;
             con.Execute(
-                "UPDATE users SET full_name=@fn, school_id=@sid, school_role=@sr WHERE email=@email",
-                new { fn = dto.FullName, sid = dto.SchoolId, sr = dto.SchoolRole, email = dto.Email });
+                "UPDATE users SET full_name=@fn, school_id=@sid, school_role=@sr, level=@lvl WHERE email=@email",
+                new { fn = dto.FullName, sid = dto.SchoolId, sr = dto.SchoolRole, lvl = level, email = dto.Email });
 
             // If school selected, add to school_users pending approval
             if (dto.SchoolId.HasValue && !string.IsNullOrEmpty(dto.SchoolRole))
