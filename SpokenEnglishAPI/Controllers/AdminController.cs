@@ -1099,7 +1099,6 @@ namespace SpokenEnglishAPI.Controllers
                          COALESCE(l.category,'Grammar') AS category, l.package_id,
                          (SELECT COUNT(*) FROM lesson_word_content wc WHERE wc.lesson_id=l.lessonid) as word_count,
                          (SELECT COUNT(*) FROM meaningquestion mq WHERE mq.lessonid=l.lessonid) as mcq_count,
-                         (SELECT COUNT(*) FROM fillinblank fb WHERE fb.lessonid=l.lessonid) as fillin_count,
                          (SELECT COUNT(*) FROM arrangesentence ar WHERE ar.lessonid=l.lessonid) as arrange_count,
                          (SELECT COUNT(*) FROM arrangesentence a JOIN arrangesentence_lang al ON al.arrangesentenceid=a.arrangesentenceid AND al.languageid=1 WHERE a.lessonid=l.lessonid AND al.tamilmeaning IS NOT NULL AND al.tamilmeaning != '') as translate_count
                   FROM lesson l
