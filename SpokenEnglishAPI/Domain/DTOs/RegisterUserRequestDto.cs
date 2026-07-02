@@ -31,7 +31,8 @@ namespace SpokenEnglishAPI.Domain.DTOs
         [MaxLength(50)]
         public string? ClassName { get; set; }
 
-        [RegularExpression("^(Beginner|Elementary|Intermediate|College|Professional)$", ErrorMessage = "Invalid level.")]
+        // 3 primary levels (Beginner/Intermediate/Advanced); legacy 5-level values still accepted.
+        [RegularExpression("^(Beginner|Intermediate|Advanced|Elementary|College|Professional)$", ErrorMessage = "Invalid level.")]
         [MaxLength(50)]
         public string? Level { get; set; }
     }

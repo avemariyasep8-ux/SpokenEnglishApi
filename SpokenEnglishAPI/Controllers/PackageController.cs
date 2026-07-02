@@ -23,7 +23,7 @@ namespace SpokenEnglishAPI.Controllers
         {
             "Beginner" or "Elementary" => "Beginner",
             "Intermediate" => "Intermediate",
-            "College" or "Professional" => "Advanced",
+            "Advanced" or "College" or "Professional" => "Advanced",
             _ => "Beginner",
         };
 

@@ -25,6 +25,7 @@ public class PackageTests
     [InlineData("Beginner", "Beginner")]
     [InlineData("Elementary", "Beginner")]
     [InlineData("Intermediate", "Intermediate")]
+    [InlineData("Advanced", "Advanced")]     // 3-level registration value
     [InlineData("College", "Advanced")]
     [InlineData("Professional", "Advanced")]
     public void LevelToPackageLevel_MapsCorrectly(string userLevel, string expected)

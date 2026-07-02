@@ -38,8 +38,9 @@ public class UserLevelTests
 
     [Theory]
     [InlineData("Beginner")]
-    [InlineData("Elementary")]
     [InlineData("Intermediate")]
+    [InlineData("Advanced")]
+    [InlineData("Elementary")]
     [InlineData("College")]
     [InlineData("Professional")]
     public void RegisterDto_ValidLevel_PassesValidation(string level)
@@ -55,7 +56,7 @@ public class UserLevelTests
     }
 
     [Theory]
-    [InlineData("Advanced")]
+    [InlineData("Superuser")]
     [InlineData("expert")]
     [InlineData("Level1")]
     [InlineData("   ")]
