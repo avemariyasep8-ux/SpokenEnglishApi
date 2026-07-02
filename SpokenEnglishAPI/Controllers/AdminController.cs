@@ -1096,6 +1096,7 @@ namespace SpokenEnglishAPI.Controllers
             using var con = _db.CreateConnection();
             var lessons = await con.QueryAsync(
                 @"SELECT l.lessonid, ll.lessonname, ll.description, l.lessonorder, l.isactive, l.is_premium, l.level,
+                         COALESCE(l.category,'Grammar') AS category, l.package_id,
                          (SELECT COUNT(*) FROM lesson_word_content wc WHERE wc.lesson_id=l.lessonid) as word_count,
                          (SELECT COUNT(*) FROM meaningquestion mq WHERE mq.lessonid=l.lessonid) as mcq_count,
                          (SELECT COUNT(*) FROM fillinblank fb WHERE fb.lessonid=l.lessonid) as fillin_count,
@@ -1114,9 +1115,11 @@ namespace SpokenEnglishAPI.Controllers
             using var con = _db.CreateConnection();
             var maxOrder = await con.ExecuteScalarAsync<int>("SELECT COALESCE(MAX(lessonorder),0) FROM lesson") + 1;
             var level = string.IsNullOrWhiteSpace(dto.Level) ? "Beginner" : dto.Level;
+            var allowedCats = new[] { "Grammar", "Vocabulary", "Conversation" };
+            var category = allowedCats.Contains(dto.Category, StringComparer.OrdinalIgnoreCase) ? dto.Category : "Grammar";
             var lid = await con.ExecuteScalarAsync<int>(
-                "INSERT INTO lesson (lessontypeid, lessonorder, isactive, is_premium, level) VALUES (1, @ord, true, @prem, @lvl) RETURNING lessonid",
-                new { ord = dto.LessonOrder ?? maxOrder, prem = dto.IsPremium, lvl = level });
+                "INSERT INTO lesson (lessontypeid, lessonorder, isactive, is_premium, level, category, package_id) VALUES (1, @ord, true, @prem, @lvl, @cat, @pid) RETURNING lessonid",
+                new { ord = dto.LessonOrder ?? maxOrder, prem = dto.IsPremium, lvl = level, cat = category, pid = dto.PackageId });
             await con.ExecuteAsync(
                 "INSERT INTO lesson_lang (lessonid, languageid, lessonname, description) VALUES (@lid, 1, @name, @desc)",
                 new { lid, name = dto.LessonName, desc = dto.Description });
@@ -1129,9 +1132,11 @@ namespace SpokenEnglishAPI.Controllers
         {
             using var con = _db.CreateConnection();
             var lvl = string.IsNullOrWhiteSpace(dto.Level) ? "Beginner" : dto.Level;
+            var allowedCats2 = new[] { "Grammar", "Vocabulary", "Conversation" };
+            var cat = allowedCats2.Contains(dto.Category, StringComparer.OrdinalIgnoreCase) ? dto.Category : "Grammar";
             await con.ExecuteAsync(
-                "UPDATE lesson SET lessonorder=@ord, isactive=@active, is_premium=@prem, level=@lvl WHERE lessonid=@id",
-                new { ord = dto.LessonOrder, active = dto.IsActive, prem = dto.IsPremium, lvl, id });
+                "UPDATE lesson SET lessonorder=@ord, isactive=@active, is_premium=@prem, level=@lvl, category=@cat, package_id=COALESCE(@pid, package_id) WHERE lessonid=@id",
+                new { ord = dto.LessonOrder, active = dto.IsActive, prem = dto.IsPremium, lvl, cat, pid = dto.PackageId, id });
             await con.ExecuteAsync(
                 "UPDATE lesson_lang SET lessonname=@name, description=@desc WHERE lessonid=@id AND languageid=1",
                 new { name = dto.LessonName, desc = dto.Description, id });
@@ -1189,7 +1194,7 @@ namespace SpokenEnglishAPI.Controllers
     public record FillInDto(int LessonId, string SentenceWithBlank, string CorrectAnswer, string? Option1, string? Option2, string? Option3, string? HintTa, int DisplayOrder);
     public record ArrangeDto(int LessonId, string CorrectSentence, string? TamilMeaning);
     public record ReadingDto(int LessonId, string SentenceText, int DisplayOrder);
-    public record CreateLessonDto(string LessonName, string? Description, int? LessonOrder, bool IsActive, bool IsPremium, string? Level);
+    public record CreateLessonDto(string LessonName, string? Description, int? LessonOrder, bool IsActive, bool IsPremium, string? Level, string? Category, int? PackageId);
     public record LessonAccessDto(int LessonId, bool HasAccess);
     public record UpsertProgressDto(int UserId, int LessonId, bool IsCompleted, DateTime? CompletedDate, int TimeSpentSeconds, int CorrectAnswers, int WrongAnswers, int TotalAttempts);
 

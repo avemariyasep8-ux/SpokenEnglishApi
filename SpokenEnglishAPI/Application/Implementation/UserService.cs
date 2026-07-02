@@ -33,6 +33,15 @@ public class UserService : IUserService
                 "UPDATE users SET full_name=@fn, school_id=@sid, school_role=@sr, level=@lvl WHERE email=@email",
                 new { fn = dto.FullName, sid = dto.SchoolId, sr = dto.SchoolRole, lvl = level, email = dto.Email });
 
+            // Auto-assign the matching learning package based on the chosen level.
+            var packageLevel = SpokenEnglishAPI.Controllers.PackageController.LevelToPackageLevel(level);
+            var packageId = con.ExecuteScalar<int?>(
+                "SELECT package_id FROM learning_package WHERE level=@lvl AND is_active=true ORDER BY display_order LIMIT 1",
+                new { lvl = packageLevel });
+            if (packageId.HasValue)
+                con.Execute("UPDATE users SET package_id=@pid WHERE email=@email",
+                    new { pid = packageId.Value, email = dto.Email });
+
             // If school selected, add to school_users pending approval
             if (dto.SchoolId.HasValue && !string.IsNullOrEmpty(dto.SchoolRole))
             {
