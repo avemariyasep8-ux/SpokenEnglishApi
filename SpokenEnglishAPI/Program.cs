@@ -29,13 +29,20 @@ namespace SpokenEnglishAPI
             builder.Logging.ClearProviders();
             builder.Host.UseNLog();
 
-            // Railway provides DATABASE_URL as postgres:// URI — convert to Npgsql format
-            var railwayDb = Environment.GetEnvironmentVariable("DATABASE_URL");
-            if (!string.IsNullOrEmpty(railwayDb))
+            // Hosts (Neon/Render/Railway/Supabase) provide DATABASE_URL as a postgres:// URI —
+            // convert to Npgsql format. Managed Postgres requires SSL, so default to Require
+            // (unless the URL explicitly says sslmode=disable). Port defaults to 5432 when absent.
+            var dbUrl = Environment.GetEnvironmentVariable("DATABASE_URL");
+            if (!string.IsNullOrEmpty(dbUrl))
             {
-                // postgres://user:pass@host:port/dbname → Host=host;Port=port;Database=dbname;Username=user;Password=pass
-                var uri = new Uri(railwayDb);
-                var npgsql = $"Host={uri.Host};Port={uri.Port};Database={uri.AbsolutePath.TrimStart('/')};Username={uri.UserInfo.Split(':')[0]};Password={uri.UserInfo.Split(':')[1]};SSL Mode=Disable";
+                var uri = new Uri(dbUrl);
+                var userInfo = uri.UserInfo.Split(':', 2);
+                var port = uri.Port > 0 ? uri.Port : 5432;
+                var sslMode = dbUrl.Contains("sslmode=disable", StringComparison.OrdinalIgnoreCase) ? "Disable" : "Require";
+                var user = Uri.UnescapeDataString(userInfo[0]);
+                var pass = Uri.UnescapeDataString(userInfo.Length > 1 ? userInfo[1] : "");
+                var npgsql = $"Host={uri.Host};Port={port};Database={uri.AbsolutePath.TrimStart('/')};" +
+                             $"Username={user};Password={pass};SSL Mode={sslMode};Trust Server Certificate=true";
                 builder.Configuration["ConnectionStrings:SE_DB"] = npgsql;
             }
 
