@@ -2,6 +2,7 @@ using Dapper;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SpokenEnglishAPI.Infrastructure.Data;
+using SpokenEnglishAPI.Infrastructure.Security;
 
 namespace SpokenEnglishAPI.Controllers
 {
@@ -65,6 +66,36 @@ namespace SpokenEnglishAPI.Controllers
                 new { id });
 
             return Ok(new { conversation = conv, turns });
+        }
+
+        // ── POST /api/conversation/{id}/complete ──────────────────────────
+        // Mark a conversation as completed for the current user.
+        [HttpPost("{id}/complete")]
+        [Authorize]
+        public async Task<IActionResult> Complete(int id, [FromBody] CompleteConvDto dto)
+        {
+            if (!OwnershipGuard.CanAccess(User, dto.UserId)) return Forbid();
+            using var con = _db.CreateConnection();
+            await con.ExecuteAsync(
+                @"INSERT INTO user_conversation_progress (user_id, conversation_id, completed_date)
+                  VALUES (@uid, @cid, NOW())
+                  ON CONFLICT (user_id, conversation_id) DO UPDATE SET completed_date = NOW()",
+                new { uid = dto.UserId, cid = id });
+            return Ok(new { message = "Conversation marked complete" });
+        }
+
+        // ── GET /api/conversation/completed/{userId} ──────────────────────
+        // Ids of conversations this user has completed.
+        [HttpGet("completed/{userId}")]
+        [Authorize]
+        public async Task<IActionResult> Completed(int userId)
+        {
+            if (!OwnershipGuard.CanAccess(User, userId)) return Forbid();
+            using var con = _db.CreateConnection();
+            var ids = await con.QueryAsync<int>(
+                "SELECT conversation_id FROM user_conversation_progress WHERE user_id=@uid",
+                new { uid = userId });
+            return Ok(ids);
         }
 
         // ── POST /api/conversation (Admin) ────────────────────────────────
@@ -154,4 +185,5 @@ namespace SpokenEnglishAPI.Controllers
 
     public record ConversationDto(string Title, string? Scenario, string? Description, string? Level, int DisplayOrder, bool IsActive);
     public record TurnDto(int TurnOrder, string SystemText, string? ExpectedResponse, string? TamilHint);
+    public record CompleteConvDto(int UserId);
 }
