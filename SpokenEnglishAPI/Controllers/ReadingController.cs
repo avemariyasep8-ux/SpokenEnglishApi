@@ -27,10 +27,13 @@ namespace SpokenEnglishAPI.Controllers
         {
             using var con = _db.CreateConnection();
             var id = await con.ExecuteScalarAsync<int>(
-                @"INSERT INTO readingsentence (lessonid, sentencetext, languageid, displayorder)
-                  VALUES (@lid, @st, @lang, (SELECT COALESCE(MAX(displayorder),0)+1 FROM readingsentence WHERE lessonid=@lid))
+                @"INSERT INTO readingsentence (lessonid, displayorder)
+                  VALUES (@lid, (SELECT COALESCE(MAX(displayorder),0)+1 FROM readingsentence WHERE lessonid=@lid))
                   RETURNING readingsentenceid",
-                new { lid = dto.LessonId, st = dto.SentenceText, lang = dto.LanguageId });
+                new { lid = dto.LessonId });
+            await con.ExecuteAsync(
+                "INSERT INTO readingsentence_lang (readingsentenceid, languageid, sentencetext) VALUES (@id, @lang, @st)",
+                new { id, lang = dto.LanguageId, st = dto.SentenceText });
             return Ok(new { readingId = id });
         }
     }

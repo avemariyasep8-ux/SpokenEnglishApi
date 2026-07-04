@@ -107,11 +107,13 @@ namespace SpokenEnglishAPI.Controllers
         {
             using var con = _db.CreateConnection();
             var rows = await con.QueryAsync(
-                @"SELECT q.questionid, q.lessonid, ll.lessonname, q.questiontext,
-                         o.optionid, o.optiontext, o.iscorrect
+                @"SELECT q.questionid, q.lessonid, ll.lessonname, ql.questiontext,
+                         o.optionid, ol.optiontext, o.iscorrect
                   FROM meaningquestion q
                   JOIN lesson_lang ll ON ll.lessonid=q.lessonid AND ll.languageid=1
+                  JOIN meaningquestion_lang ql ON ql.questionid=q.questionid AND ql.languageid=1
                   JOIN meaningoption o ON o.questionid=q.questionid
+                  JOIN meaningoption_lang ol ON ol.optionid=o.optionid AND ol.languageid=1
                   ORDER BY q.lessonid, q.questionid, o.iscorrect DESC");
 
             var csv = "QuestionId,LessonId,LessonName,QuestionText,OptionId,OptionText,IsCorrect\n" +
@@ -904,9 +906,11 @@ namespace SpokenEnglishAPI.Controllers
         {
             using var con = _db.CreateConnection();
             var rows = await con.QueryAsync(
-                @"SELECT readingsentenceid AS id, lessonid, sentencetext, displayorder
-                  FROM readingsentence WHERE lessonid=@lid AND languageid=1
-                  ORDER BY displayorder, readingsentenceid",
+                @"SELECT r.readingsentenceid AS id, r.lessonid, rl.sentencetext, r.displayorder
+                  FROM readingsentence r
+                  JOIN readingsentence_lang rl ON rl.readingsentenceid=r.readingsentenceid AND rl.languageid=1
+                  WHERE r.lessonid=@lid
+                  ORDER BY r.displayorder, r.readingsentenceid",
                 new { lid = lessonId });
             return Ok(rows);
         }
@@ -917,10 +921,13 @@ namespace SpokenEnglishAPI.Controllers
             if (string.IsNullOrWhiteSpace(dto.SentenceText)) return BadRequest(new { message = "Sentence text required" });
             using var con = _db.CreateConnection();
             var id = await con.ExecuteScalarAsync<int>(
-                @"INSERT INTO readingsentence (lessonid, sentencetext, languageid, displayorder)
-                  VALUES (@lid, @st, 1, COALESCE((SELECT MAX(displayorder)+1 FROM readingsentence WHERE lessonid=@lid), @ord))
+                @"INSERT INTO readingsentence (lessonid, displayorder)
+                  VALUES (@lid, COALESCE((SELECT MAX(displayorder)+1 FROM readingsentence WHERE lessonid=@lid), @ord))
                   RETURNING readingsentenceid",
-                new { lid = dto.LessonId, st = dto.SentenceText, ord = dto.DisplayOrder });
+                new { lid = dto.LessonId, ord = dto.DisplayOrder });
+            await con.ExecuteAsync(
+                "INSERT INTO readingsentence_lang (readingsentenceid, languageid, sentencetext) VALUES (@id, 1, @st)",
+                new { id, st = dto.SentenceText });
             return Ok(new { id, message = "Reading sentence added" });
         }
 
@@ -929,8 +936,11 @@ namespace SpokenEnglishAPI.Controllers
         {
             using var con = _db.CreateConnection();
             await con.ExecuteAsync(
-                "UPDATE readingsentence SET sentencetext=@st, displayorder=@ord WHERE readingsentenceid=@id AND languageid=1",
-                new { st = dto.SentenceText, ord = dto.DisplayOrder, id });
+                "UPDATE readingsentence SET displayorder=@ord WHERE readingsentenceid=@id",
+                new { ord = dto.DisplayOrder, id });
+            await con.ExecuteAsync(
+                "UPDATE readingsentence_lang SET sentencetext=@st WHERE readingsentenceid=@id AND languageid=1",
+                new { st = dto.SentenceText, id });
             return Ok(new { message = "Reading sentence updated" });
         }
 
@@ -938,6 +948,7 @@ namespace SpokenEnglishAPI.Controllers
         public async Task<IActionResult> DeleteReading(int id)
         {
             using var con = _db.CreateConnection();
+            await con.ExecuteAsync("DELETE FROM readingsentence_lang WHERE readingsentenceid=@id", new { id });
             await con.ExecuteAsync("DELETE FROM readingsentence WHERE readingsentenceid=@id", new { id });
             return Ok(new { message = "Deleted" });
         }
@@ -948,10 +959,10 @@ namespace SpokenEnglishAPI.Controllers
         {
             using var con = _db.CreateConnection();
             var rows = await con.QueryAsync(
-                @"SELECT r.readingsentenceid, r.lessonid, ll.lessonname, r.sentencetext, r.displayorder
+                @"SELECT r.readingsentenceid, r.lessonid, ll.lessonname, rl.sentencetext, r.displayorder
                   FROM readingsentence r
                   JOIN lesson_lang ll ON ll.lessonid=r.lessonid AND ll.languageid=1
-                  WHERE r.languageid=1
+                  JOIN readingsentence_lang rl ON rl.readingsentenceid=r.readingsentenceid AND rl.languageid=1
                   ORDER BY r.lessonid, r.displayorder");
 
             var csv = "ReadingSentenceId,LessonId,LessonName,SentenceText,DisplayOrder\n" +
@@ -988,10 +999,12 @@ namespace SpokenEnglishAPI.Controllers
                     if (string.IsNullOrWhiteSpace(text)) { skipped++; continue; }
                     int ord = cols.Length >= 3 && int.TryParse(cols[2], out int o) ? o : 0;
 
+                    var newId = await con.ExecuteScalarAsync<int>(
+                        "INSERT INTO readingsentence (lessonid, displayorder) VALUES (@lid, @ord) RETURNING readingsentenceid",
+                        new { lid = lessonId, ord });
                     await con.ExecuteAsync(
-                        @"INSERT INTO readingsentence (lessonid, sentencetext, languageid, displayorder)
-                          VALUES (@lid, @st, 1, @ord)",
-                        new { lid = lessonId, st = text, ord });
+                        "INSERT INTO readingsentence_lang (readingsentenceid, languageid, sentencetext) VALUES (@id, 1, @st)",
+                        new { id = newId, st = text });
                     imported++;
                 }
                 catch { skipped++; }

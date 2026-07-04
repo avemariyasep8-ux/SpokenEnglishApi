@@ -24,14 +24,15 @@ public class UserService : IUserService
 
         _userRepository.CreateUser(dto.Email, passwordHash, apiKey);
 
-        // Set full_name, level, and school_role on the newly created user
-        if (!string.IsNullOrEmpty(dto.FullName) || dto.SchoolId.HasValue || !string.IsNullOrEmpty(dto.Level))
+        // Set mobile number, full_name, level, and school_role on the newly created user.
+        // mobnumber is [Required] on the DTO so this always runs — without it, login by
+        // mobile number is silently broken (mobilenumber stays blank in the users table).
         {
             using var con = _db.CreateConnection();
             var level = string.IsNullOrWhiteSpace(dto.Level) ? "Beginner" : dto.Level;
             con.Execute(
-                "UPDATE users SET full_name=@fn, school_id=@sid, school_role=@sr, level=@lvl WHERE email=@email",
-                new { fn = dto.FullName, sid = dto.SchoolId, sr = dto.SchoolRole, lvl = level, email = dto.Email });
+                "UPDATE users SET mobilenumber=@mob, full_name=@fn, school_id=@sid, school_role=@sr, level=@lvl WHERE email=@email",
+                new { mob = dto.mobnumber, fn = dto.FullName, sid = dto.SchoolId, sr = dto.SchoolRole, lvl = level, email = dto.Email });
 
             // Auto-assign the matching learning package based on the chosen level.
             var packageLevel = SpokenEnglishAPI.Controllers.PackageController.LevelToPackageLevel(level);
