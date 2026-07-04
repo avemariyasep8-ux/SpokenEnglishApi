@@ -12,6 +12,7 @@ namespace SpokenEnglishAPI.Domain.DTOs
         public string? ExampleEn { get; set; }
         public string? ExampleTa { get; set; }
         public int DisplayOrder { get; set; }
+        public string? Emoji { get; set; }
     }
 
     // ─── SUBSCRIPTION ────────────────────────────────────────────

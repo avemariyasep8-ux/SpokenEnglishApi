@@ -59,7 +59,7 @@ namespace SpokenEnglishAPI.Controllers
                   FROM lesson l
                   JOIN lesson_lang ll ON ll.lessonid = l.lessonid AND ll.languageid = 1
                   WHERE l.package_id = @id
-                  ORDER BY l.category, l.lessonorder",
+                  ORDER BY l.lessonorder",
                 new { id });
 
             return Ok(new { package = pkg, lessons });
