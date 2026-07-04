@@ -24,7 +24,9 @@ namespace SpokenEnglishAPI.Middleware
             "/api/auth/otp-login",
         };
 
-        private const int MaxAttempts = 10;                 // attempts allowed...
+        // 25/5min still blocks realistic brute force (BCrypt + strong passwords) while
+        // letting a real tester register several accounts and retry logins without a 429.
+        private const int MaxAttempts = 25;                 // attempts allowed...
         private static readonly TimeSpan Window = TimeSpan.FromMinutes(5);   // ...per window, per IP
 
         // ip -> (windowStart, count). Pruned lazily on access.
