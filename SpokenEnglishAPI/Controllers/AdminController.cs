@@ -1,6 +1,7 @@
 using Dapper;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using MiniExcelLibs;
 using Npgsql;
 using SpokenEnglishAPI.Infrastructure.Data;
 
@@ -446,6 +447,78 @@ namespace SpokenEnglishAPI.Controllers
             var hash = BCrypt.Net.BCrypt.HashPassword(dto.NewPassword);
             await con.ExecuteAsync("UPDATE users SET passwordhash=@hash, modifydate=NOW() WHERE id=@id", new { hash, id });
             return Ok(new { message = "Password updated" });
+        }
+
+        // ── GET /api/admin/export/all ─────────────────────────────────────────
+        // A single .xlsx workbook with every lesson data type as its own sheet/tab
+        // (Lessons, WordContent, MCQ, ArrangeTranslate, Reading), each row tagged with
+        // LanguageId so the data is unambiguous once more languages are added.
+        [HttpGet("export/all")]
+        public async Task<IActionResult> ExportAll()
+        {
+            using var con = _db.CreateConnection();
+
+            var lessons = await con.QueryAsync(
+                @"SELECT l.lessonid AS LessonId, ll.lessonname AS LessonName, ll.description AS Description,
+                         lt.typename AS TypeName, l.lessonorder AS LessonOrder, l.isactive AS IsActive,
+                         l.is_premium AS IsPremium, COALESCE(l.level,'Beginner') AS Level,
+                         COALESCE(l.category,'Grammar') AS Category, 1 AS LanguageId
+                  FROM lesson l
+                  JOIN lesson_lang ll ON ll.lessonid=l.lessonid AND ll.languageid=1
+                  LEFT JOIN lessontype lt ON lt.lessontypeid=l.lessontypeid
+                  ORDER BY l.lessonorder");
+
+            var wordContent = await con.QueryAsync(
+                @"SELECT wc.content_id AS ContentId, wc.lesson_id AS LessonId, ll.lessonname AS LessonName,
+                         wc.word_name AS WordName, wc.sentence_pattern AS SentencePattern,
+                         wc.definition_en AS DefinitionEn, wc.definition_ta AS DefinitionTa,
+                         wc.example_en AS ExampleEn, wc.example_ta AS ExampleTa,
+                         wc.display_order AS DisplayOrder, 1 AS LanguageId
+                  FROM lesson_word_content wc
+                  JOIN lesson_lang ll ON ll.lessonid=wc.lesson_id AND ll.languageid=1
+                  ORDER BY wc.lesson_id, wc.display_order");
+
+            var mcq = await con.QueryAsync(
+                @"SELECT q.questionid AS QuestionId, q.lessonid AS LessonId, ll.lessonname AS LessonName,
+                         ql.questiontext AS QuestionText, o.optionid AS OptionId,
+                         ol.optiontext AS OptionText, o.iscorrect AS IsCorrect, 1 AS LanguageId
+                  FROM meaningquestion q
+                  JOIN lesson_lang ll ON ll.lessonid=q.lessonid AND ll.languageid=1
+                  JOIN meaningquestion_lang ql ON ql.questionid=q.questionid AND ql.languageid=1
+                  JOIN meaningoption o ON o.questionid=q.questionid
+                  JOIN meaningoption_lang ol ON ol.optionid=o.optionid AND ol.languageid=1
+                  ORDER BY q.lessonid, q.questionid, o.iscorrect DESC");
+
+            var arrange = await con.QueryAsync(
+                @"SELECT a.arrangesentenceid AS ArrangeSentenceId, a.lessonid AS LessonId, ll.lessonname AS LessonName,
+                         al.correctsentence AS CorrectSentence, al.tamilmeaning AS TamilMeaning, 1 AS LanguageId
+                  FROM arrangesentence a
+                  JOIN arrangesentence_lang al ON al.arrangesentenceid=a.arrangesentenceid AND al.languageid=1
+                  JOIN lesson_lang ll ON ll.lessonid=a.lessonid AND ll.languageid=1
+                  ORDER BY a.lessonid, a.arrangesentenceid");
+
+            var reading = await con.QueryAsync(
+                @"SELECT r.readingsentenceid AS ReadingSentenceId, r.lessonid AS LessonId, ll.lessonname AS LessonName,
+                         rl.sentencetext AS SentenceText, r.displayorder AS DisplayOrder, rl.languageid AS LanguageId
+                  FROM readingsentence r
+                  JOIN readingsentence_lang rl ON rl.readingsentenceid=r.readingsentenceid
+                  JOIN lesson_lang ll ON ll.lessonid=r.lessonid AND ll.languageid=1
+                  ORDER BY r.lessonid, r.displayorder");
+
+            var sheets = new Dictionary<string, object>
+            {
+                ["Lessons"] = lessons,
+                ["WordContent"] = wordContent,
+                ["MCQ"] = mcq,
+                ["ArrangeTranslate"] = arrange,
+                ["Reading"] = reading,
+            };
+
+            using var stream = new MemoryStream();
+            stream.SaveAs(sheets);
+            return File(stream.ToArray(),
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                $"spokenenglish_export_{DateTime.UtcNow:yyyyMMdd}.xlsx");
         }
 
         // ── GET /api/admin/lesson-stats ───────────────────────────────────────

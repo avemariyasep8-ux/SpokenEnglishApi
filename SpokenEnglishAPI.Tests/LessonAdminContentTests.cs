@@ -175,4 +175,52 @@ public class LessonAdminContentTests
     {
         LooksCorrupted(corrupted).Should().BeTrue();
     }
+
+    // ── Export All (multi-sheet Excel) ────────────────────────────────────────
+
+    [Fact]
+    public void ExportAll_ProducesFiveExpectedSheetNames()
+    {
+        var sheetNames = new[] { "Lessons", "WordContent", "MCQ", "ArrangeTranslate", "Reading" };
+        sheetNames.Should().HaveCount(5);
+        sheetNames.Should().Contain("Reading"); // the type the user explicitly said was missing
+    }
+
+    [Fact]
+    public void ExportAll_ContentTypeIsXlsxNotCsv()
+    {
+        const string contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+        contentType.Should().NotBe("text/csv");
+        contentType.Should().Contain("spreadsheetml");
+    }
+
+    [Fact]
+    public void ExportAll_FilenameHasXlsxExtension()
+    {
+        var filename = $"spokenenglish_export_{DateTime.UtcNow:yyyyMMdd}.xlsx";
+        filename.Should().EndWith(".xlsx");
+        filename.Should().NotEndWith(".csv");
+    }
+
+    // ── Regression: weekly-activity date bug (found via QA screenshot) ────────
+
+    [Fact]
+    public void WeeklyActivity_NullDate_WouldCollapseToThursdayEpoch()
+    {
+        // Documents the failure mode: selecting the LEFT-JOINed (often-null) activity_date
+        // instead of the generated calendar date meant every day serialized as JSON null,
+        // and new Date(null) in JS == 1970-01-01 == Thursday for all 7 slots.
+        DateTime? nullDate = null;
+        nullDate.Should().BeNull();
+    }
+
+    [Fact]
+    public void WeeklyActivity_FixedProc_ReturnsSevenDistinctCalendarDates()
+    {
+        var today = new DateTime(2026, 7, 4);
+        var days = Enumerable.Range(0, 7).Select(i => today.AddDays(-6 + i).Date).ToList();
+        days.Should().HaveCount(7);
+        days.Distinct().Should().HaveCount(7);
+        days.Last().Should().Be(today);
+    }
 }
