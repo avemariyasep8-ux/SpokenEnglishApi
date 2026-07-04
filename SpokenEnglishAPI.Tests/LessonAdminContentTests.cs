@@ -152,4 +152,27 @@ public class LessonAdminContentTests
         var translateCount = rows.Count(r => !string.IsNullOrWhiteSpace(r.Tamil));
         translateCount.Should().Be(2);
     }
+
+    // ── Regression: Tamil mojibake detection (found in production 2026-07-04) ──
+    // A batch of arrangesentence_lang.tamilmeaning rows were corrupted to literal "?"
+    // characters by a bad write path. Mirrors the heuristic used to find/verify them:
+    // 3+ consecutive '?' is corruption, a single '?' is valid Tamil question punctuation.
+    private static bool LooksCorrupted(string text) =>
+        System.Text.RegularExpressions.Regex.IsMatch(text, @"\?{3,}");
+
+    [Theory]
+    [InlineData("இதன் விலை என்ன?")]           // valid Tamil question — single '?' is fine
+    [InlineData("நான் சாதம் சாப்பிடுகிறேன்.")]
+    public void ValidTamilText_IsNotFlaggedAsCorrupted(string tamil)
+    {
+        LooksCorrupted(tamil).Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData("???? ??? ?????.")]
+    [InlineData("??????? ??? ??????????????.")]
+    public void MojibakeText_IsFlaggedAsCorrupted(string corrupted)
+    {
+        LooksCorrupted(corrupted).Should().BeTrue();
+    }
 }
