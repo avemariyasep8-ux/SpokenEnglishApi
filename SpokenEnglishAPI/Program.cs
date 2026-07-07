@@ -238,14 +238,18 @@ namespace SpokenEnglishAPI
             // Skip HTTPS redirect in production (Railway terminates TLS at load balancer)
             if (app.Environment.IsDevelopment()) app.UseHttpsRedirection();
 
-            // Rate limiting before CORS/auth
+            // CORS must run BEFORE anything that can short-circuit the pipeline with an
+            // error response (rate limiter, auth). Otherwise a 429/401 response is sent
+            // without Access-Control-Allow-Origin, and the browser blocks it entirely as
+            // an opaque CORS failure — which looks exactly like a network error to the
+            // frontend (no err.response at all), even though the server actually replied.
+            app.UseCors("ReactPolicy");
+
+            // Rate limiting after CORS so its responses are still readable by the browser
             app.UseRateLimiter();
 
             // Stricter brute-force throttle for auth endpoints
             app.UseMiddleware<RateLimitMiddleware>();
-
-            // CORS must come before Auth
-            app.UseCors("ReactPolicy");
 
             app.UseAuthentication();
             app.UseAuthorization();
