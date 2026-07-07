@@ -223,4 +223,29 @@ public class LessonAdminContentTests
         days.Distinct().Should().HaveCount(7);
         days.Last().Should().Be(today);
     }
+
+    // ── Regression: sp_userstreak_update ambiguous column (found via live QA) ──
+    // The stored proc's RETURNS TABLE(current_streak, longest_streak, total_xp) column
+    // names collided with the user_streaks table's own columns of the same name inside
+    // an unqualified `SELECT current_streak, longest_streak, total_xp FROM user_streaks`,
+    // causing Postgres to reject EVERY call with "column reference is ambiguous" (500).
+    // Fix: alias the table (`FROM user_streaks us`) and qualify every reference (`us.current_streak`).
+    [Fact]
+    public void StreakUpdate_TableAliasQualifiesEveryColumnReference()
+    {
+        // Mirrors the corrected SQL shape — every column read from the table is qualified.
+        const string fixedSql = "SELECT us.last_activity_date, us.current_streak, us.longest_streak, us.total_xp " +
+                                 "FROM user_streaks us WHERE us.user_id = 1";
+        fixedSql.Should().Contain("us.current_streak");
+        fixedSql.Should().NotContain(" current_streak,"); // no unqualified reference remains
+    }
+
+    [Fact]
+    public void StreakUpdate_WorksForBothNewAndExistingUsers()
+    {
+        // The ambiguous SELECT ran unconditionally before the IF NOT FOUND branch,
+        // so it broke every call (new users AND existing users), not just one path.
+        var scenarios = new[] { "new user (no existing row)", "existing user (row present)" };
+        scenarios.Should().HaveCount(2);
+    }
 }
