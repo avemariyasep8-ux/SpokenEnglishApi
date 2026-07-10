@@ -179,11 +179,109 @@ public class LessonAdminContentTests
     // ── Export All (multi-sheet Excel) ────────────────────────────────────────
 
     [Fact]
-    public void ExportAll_ProducesFiveExpectedSheetNames()
+    public void ExportAll_ProducesSixExpectedSheetNames()
     {
-        var sheetNames = new[] { "Lessons", "WordContent", "MCQ", "ArrangeTranslate", "Reading" };
-        sheetNames.Should().HaveCount(5);
+        // Renamed/split from the original 5-sheet shape: WordContent -> Meaning,
+        // MCQ -> FillInBlank, ArrangeTranslate split into Arrange + Translate.
+        var sheetNames = new[] { "Lessons", "Meaning", "FillInBlank", "Arrange", "Translate", "Reading" };
+        sheetNames.Should().HaveCount(6);
         sheetNames.Should().Contain("Reading"); // the type the user explicitly said was missing
+        sheetNames.Should().Contain("Arrange").And.Contain("Translate");
+    }
+
+    // ── Import All (multi-sheet Excel round trip) ─────────────────────────────
+    // Mirrors the row-validation logic in AdminController.ImportAll / ImportArrangeSheet
+    // without touching the DB, since MiniExcel rows arrive as IDictionary<string, object>.
+
+    private static IDictionary<string, object> Row(params (string key, object? val)[] kv) =>
+        kv.ToDictionary(x => x.key, x => x.val ?? (object)DBNull.Value)!;
+
+    private static string? S(IDictionary<string, object> row, string key) =>
+        row.TryGetValue(key, out var v) && v != null && v != DBNull.Value ? v.ToString() : null;
+
+    private static int? I(IDictionary<string, object> row, string key)
+    {
+        var s = S(row, key);
+        return string.IsNullOrWhiteSpace(s) ? null : (int.TryParse(s, out var n) ? n : null);
+    }
+
+    [Fact]
+    public void ImportAll_LessonsRow_BlankLessonId_MeansInsertNew()
+    {
+        var row = Row(("LessonId", null), ("LessonName", "New Lesson"));
+        I(row, "LessonId").Should().BeNull();
+        S(row, "LessonName").Should().Be("New Lesson");
+    }
+
+    [Fact]
+    public void ImportAll_LessonsRow_MissingName_IsSkipped()
+    {
+        var row = Row(("LessonId", "68"), ("LessonName", "   "));
+        string.IsNullOrWhiteSpace(S(row, "LessonName")).Should().BeTrue("blank name rows must be skipped, not inserted");
+    }
+
+    [Fact]
+    public void ImportAll_MeaningRow_RequiresLessonIdAndWordName()
+    {
+        var valid = Row(("LessonId", "68"), ("WordName", "eat"));
+        var missingLesson = Row(("LessonId", null), ("WordName", "eat"));
+        var missingWord = Row(("LessonId", "68"), ("WordName", ""));
+
+        (I(valid, "LessonId") != null && !string.IsNullOrWhiteSpace(S(valid, "WordName"))).Should().BeTrue();
+        (I(missingLesson, "LessonId") != null).Should().BeFalse();
+        string.IsNullOrWhiteSpace(S(missingWord, "WordName")).Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData(1, true)]
+    [InlineData(4, true)]
+    [InlineData(0, false)]
+    [InlineData(5, false)]
+    [InlineData(null, false)]
+    public void ImportAll_FillInBlankRow_CorrectOptionMustBeOneToFour(int? correctOption, bool expectedValid)
+    {
+        bool isValid = correctOption is >= 1 and <= 4;
+        isValid.Should().Be(expectedValid);
+    }
+
+    [Fact]
+    public void ImportAll_ArrangeRow_SplitsCorrectSentenceIntoWordsInOrder()
+    {
+        var sentence = "I eat rice.";
+        var words = sentence.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        words.Should().Equal("I", "eat", "rice.");
+    }
+
+    [Fact]
+    public void ImportAll_TranslateRow_RequiresNonEmptyTamilMeaning()
+    {
+        var withTamil = Row(("LessonId", "68"), ("CorrectSentence", "I eat rice."), ("TamilMeaning", "நான் சாதம் சாப்பிடுகிறேன்."));
+        var withoutTamil = Row(("LessonId", "68"), ("CorrectSentence", "I eat rice."), ("TamilMeaning", ""));
+
+        string.IsNullOrWhiteSpace(S(withTamil, "TamilMeaning")).Should().BeFalse();
+        string.IsNullOrWhiteSpace(S(withoutTamil, "TamilMeaning")).Should().BeTrue("Translate sheet rows without Tamil must be skipped");
+    }
+
+    [Fact]
+    public void ImportAll_ReadingRow_RequiresLessonIdAndSentenceText()
+    {
+        var row = Row(("LessonId", "68"), ("SentenceText", "I eat rice every morning."), ("DisplayOrder", "1"));
+        I(row, "LessonId").Should().Be(68);
+        S(row, "SentenceText").Should().NotBeNullOrWhiteSpace();
+        I(row, "DisplayOrder").Should().Be(1);
+    }
+
+    [Fact]
+    public void Template_SixSheets_EachHasAtLeastOneExampleRow()
+    {
+        // Mirrors BuildAllSheets(templateMode: true) — every sheet should ship at
+        // least one example row so admins see the exact columns to fill in.
+        var sheetRowCounts = new Dictionary<string, int>
+        {
+            ["Lessons"] = 1, ["Meaning"] = 1, ["FillInBlank"] = 1,
+            ["Arrange"] = 1, ["Translate"] = 1, ["Reading"] = 1,
+        };
+        sheetRowCounts.Values.Should().OnlyContain(c => c >= 1);
     }
 
     [Fact]

@@ -450,25 +450,92 @@ namespace SpokenEnglishAPI.Controllers
         }
 
         // ── GET /api/admin/export/all ─────────────────────────────────────────
-        // A single .xlsx workbook with every lesson data type as its own sheet/tab
-        // (Lessons, WordContent, MCQ, ArrangeTranslate, Reading), each row tagged with
-        // LanguageId so the data is unambiguous once more languages are added.
+        // A single .xlsx workbook with every lesson data type as its own sheet/tab:
+        // Lessons, Meaning (word content — Meaning & Example steps), FillInBlank (MCQ),
+        // Arrange, Translate, Reading. Every row is tagged with LessonId + LanguageId.
+        // Arrange and Translate share the same underlying table (arrangesentence) —
+        // Translate is just the subset that has a Tamil meaning — but are split into
+        // two tabs because they are two distinct lesson steps.
         [HttpGet("export/all")]
         public async Task<IActionResult> ExportAll()
         {
+            var sheets = await BuildAllSheets(templateMode: false);
+            using var stream = new MemoryStream();
+            stream.SaveAs(sheets);
+            return File(stream.ToArray(),
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                $"spokenenglish_export_{DateTime.UtcNow:yyyyMMdd}.xlsx");
+        }
+
+        // ── GET /api/admin/template/all ────────────────────────────────────────
+        // Same 6-tab shape as export/all, but pre-filled with 1-2 example rows per
+        // sheet (referencing a real existing LessonId) so an admin can see exactly
+        // what to fill in before importing it back via /import/all.
+        [HttpGet("template/all")]
+        public async Task<IActionResult> TemplateAll()
+        {
+            var sheets = await BuildAllSheets(templateMode: true);
+            using var stream = new MemoryStream();
+            stream.SaveAs(sheets);
+            return File(stream.ToArray(),
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                "spokenenglish_import_template.xlsx");
+        }
+
+        private async Task<Dictionary<string, object>> BuildAllSheets(bool templateMode)
+        {
             using var con = _db.CreateConnection();
+
+            if (templateMode)
+            {
+                // Use a real, existing lesson id as the example reference so the
+                // sample rows are directly importable/re-importable without edits.
+                var sampleLessonId = await con.ExecuteScalarAsync<int?>("SELECT MIN(lessonid) FROM lesson") ?? 1;
+                return new Dictionary<string, object>
+                {
+                    ["Lessons"] = new[] {
+                        new { LessonId = (int?)null, LessonName = "New Lesson Example", Description = "Describe what this lesson teaches.",
+                              Level = "Beginner", Category = "Grammar", IsPremium = false, LessonOrder = 999, LanguageId = 1 },
+                    },
+                    ["Meaning"] = new[] {
+                        new { ContentId = (int?)null, LessonId = sampleLessonId, WordName = "eat", SentencePattern = "Subject + Verb + Object",
+                              DefinitionEn = "to take food", DefinitionTa = "சாப்பிட", ExampleEn = "I eat rice.", ExampleTa = "நான் சாதம் சாப்பிடுகிறேன்.",
+                              DisplayOrder = 1, LanguageId = 1 },
+                    },
+                    ["FillInBlank"] = new[] {
+                        new { LessonId = sampleLessonId, QuestionText = "I ___ rice every day.", Option1 = "eat", Option2 = "eats", Option3 = "eating", Option4 = "ate",
+                              CorrectOption = 1, LanguageId = 1 },
+                    },
+                    ["Arrange"] = new[] {
+                        new { ArrangeSentenceId = (int?)null, LessonId = sampleLessonId, CorrectSentence = "I eat rice.", LanguageId = 1 },
+                    },
+                    ["Translate"] = new[] {
+                        new { ArrangeSentenceId = (int?)null, LessonId = sampleLessonId, CorrectSentence = "I eat rice.",
+                              TamilMeaning = "நான் சாதம் சாப்பிடுகிறேன்.", LanguageId = 1 },
+                    },
+                    ["Reading"] = new[] {
+                        new { ReadingSentenceId = (int?)null, LessonId = sampleLessonId, SentenceText = "I eat rice and drink water every morning.",
+                              DisplayOrder = 1, LanguageId = 1 },
+                    },
+                    ["Instructions"] = new[] {
+                        new { Note = "LessonId must reference an EXISTING lesson (see the Lessons tab / Admin > Lessons for ids)." },
+                        new { Note = "Leave *Id columns blank when adding a NEW row — the database assigns the id." },
+                        new { Note = "To ADD a new lesson AND its content in one import: first import just the Lessons tab, note the new LessonId from the response, then fill the other tabs with that id and import again." },
+                        new { Note = "Arrange and Translate use the same sentence table — Translate rows must have a non-empty TamilMeaning." },
+                        new { Note = "CorrectOption in FillInBlank is 1-4, matching Option1-Option4." },
+                    },
+                };
+            }
 
             var lessons = await con.QueryAsync(
                 @"SELECT l.lessonid AS LessonId, ll.lessonname AS LessonName, ll.description AS Description,
-                         lt.typename AS TypeName, l.lessonorder AS LessonOrder, l.isactive AS IsActive,
-                         l.is_premium AS IsPremium, COALESCE(l.level,'Beginner') AS Level,
-                         COALESCE(l.category,'Grammar') AS Category, 1 AS LanguageId
+                         COALESCE(l.level,'Beginner') AS Level, COALESCE(l.category,'Grammar') AS Category,
+                         l.is_premium AS IsPremium, l.lessonorder AS LessonOrder, l.isactive AS IsActive, 1 AS LanguageId
                   FROM lesson l
                   JOIN lesson_lang ll ON ll.lessonid=l.lessonid AND ll.languageid=1
-                  LEFT JOIN lessontype lt ON lt.lessontypeid=l.lessontypeid
                   ORDER BY l.lessonorder");
 
-            var wordContent = await con.QueryAsync(
+            var meaning = await con.QueryAsync(
                 @"SELECT wc.content_id AS ContentId, wc.lesson_id AS LessonId, ll.lessonname AS LessonName,
                          wc.word_name AS WordName, wc.sentence_pattern AS SentencePattern,
                          wc.definition_en AS DefinitionEn, wc.definition_ta AS DefinitionTa,
@@ -478,7 +545,7 @@ namespace SpokenEnglishAPI.Controllers
                   JOIN lesson_lang ll ON ll.lessonid=wc.lesson_id AND ll.languageid=1
                   ORDER BY wc.lesson_id, wc.display_order");
 
-            var mcq = await con.QueryAsync(
+            var fillInBlank = await con.QueryAsync(
                 @"SELECT q.questionid AS QuestionId, q.lessonid AS LessonId, ll.lessonname AS LessonName,
                          ql.questiontext AS QuestionText, o.optionid AS OptionId,
                          ol.optiontext AS OptionText, o.iscorrect AS IsCorrect, 1 AS LanguageId
@@ -491,10 +558,19 @@ namespace SpokenEnglishAPI.Controllers
 
             var arrange = await con.QueryAsync(
                 @"SELECT a.arrangesentenceid AS ArrangeSentenceId, a.lessonid AS LessonId, ll.lessonname AS LessonName,
+                         al.correctsentence AS CorrectSentence, 1 AS LanguageId
+                  FROM arrangesentence a
+                  JOIN arrangesentence_lang al ON al.arrangesentenceid=a.arrangesentenceid AND al.languageid=1
+                  JOIN lesson_lang ll ON ll.lessonid=a.lessonid AND ll.languageid=1
+                  ORDER BY a.lessonid, a.arrangesentenceid");
+
+            var translate = await con.QueryAsync(
+                @"SELECT a.arrangesentenceid AS ArrangeSentenceId, a.lessonid AS LessonId, ll.lessonname AS LessonName,
                          al.correctsentence AS CorrectSentence, al.tamilmeaning AS TamilMeaning, 1 AS LanguageId
                   FROM arrangesentence a
                   JOIN arrangesentence_lang al ON al.arrangesentenceid=a.arrangesentenceid AND al.languageid=1
                   JOIN lesson_lang ll ON ll.lessonid=a.lessonid AND ll.languageid=1
+                  WHERE al.tamilmeaning IS NOT NULL AND al.tamilmeaning <> ''
                   ORDER BY a.lessonid, a.arrangesentenceid");
 
             var reading = await con.QueryAsync(
@@ -505,20 +581,220 @@ namespace SpokenEnglishAPI.Controllers
                   JOIN lesson_lang ll ON ll.lessonid=r.lessonid AND ll.languageid=1
                   ORDER BY r.lessonid, r.displayorder");
 
-            var sheets = new Dictionary<string, object>
+            return new Dictionary<string, object>
             {
                 ["Lessons"] = lessons,
-                ["WordContent"] = wordContent,
-                ["MCQ"] = mcq,
-                ["ArrangeTranslate"] = arrange,
+                ["Meaning"] = meaning,
+                ["FillInBlank"] = fillInBlank,
+                ["Arrange"] = arrange,
+                ["Translate"] = translate,
                 ["Reading"] = reading,
             };
+        }
 
-            using var stream = new MemoryStream();
-            stream.SaveAs(sheets);
-            return File(stream.ToArray(),
-                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                $"spokenenglish_export_{DateTime.UtcNow:yyyyMMdd}.xlsx");
+        // ── POST /api/admin/import/all ────────────────────────────────────────
+        // Imports a single .xlsx workbook with the same 6 tabs as export/all /
+        // template/all. Every content tab (Meaning/FillInBlank/Arrange/Translate/
+        // Reading) requires LessonId to reference an EXISTING lesson. Processes
+        // sheets in order (Lessons first) so new lessons created in this same
+        // workbook, once you know their assigned id, can be referenced by later
+        // re-imports. Returns a per-sheet imported/skipped summary.
+        [HttpPost("import/all")]
+        [Consumes("multipart/form-data")]
+        public async Task<IActionResult> ImportAll(IFormFile file)
+        {
+            if (file == null || file.Length == 0) return BadRequest(new { message = "No file" });
+
+            using var con = _db.CreateConnection();
+            var summary = new List<object>();
+
+            using var stream = file.OpenReadStream();
+            var sheetNames = stream.GetSheetNames();
+
+            static string? S(IDictionary<string, object> row, string key) =>
+                row.TryGetValue(key, out var v) && v != null ? v.ToString() : null;
+            static int? I(IDictionary<string, object> row, string key)
+            {
+                var s = S(row, key);
+                return string.IsNullOrWhiteSpace(s) ? null : (int.TryParse(s, out var n) ? n : null);
+            }
+            static bool B(IDictionary<string, object> row, string key)
+            {
+                var s = S(row, key)?.Trim().ToLowerInvariant();
+                return s == "true" || s == "1" || s == "yes";
+            }
+
+            if (sheetNames.Contains("Lessons"))
+            {
+                int imported = 0, skipped = 0;
+                foreach (var row in stream.Query(sheetName: "Lessons").Cast<IDictionary<string, object>>())
+                {
+                    var name = S(row, "LessonName");
+                    if (string.IsNullOrWhiteSpace(name)) { skipped++; continue; }
+                    try
+                    {
+                        var lessonId = I(row, "LessonId");
+                        var level = S(row, "Level") ?? "Beginner";
+                        var category = S(row, "Category") ?? "Grammar";
+                        var desc = S(row, "Description") ?? "";
+                        var isPremium = B(row, "IsPremium");
+                        var order = I(row, "LessonOrder");
+
+                        if (lessonId.HasValue)
+                        {
+                            await con.ExecuteAsync(
+                                "UPDATE lesson SET level=@lvl, category=@cat, is_premium=@prem, lessonorder=COALESCE(@ord, lessonorder) WHERE lessonid=@id",
+                                new { lvl = level, cat = category, prem = isPremium, ord = order, id = lessonId.Value });
+                            await con.ExecuteAsync(
+                                "UPDATE lesson_lang SET lessonname=@n, description=@d WHERE lessonid=@id AND languageid=1",
+                                new { n = name, d = desc, id = lessonId.Value });
+                        }
+                        else
+                        {
+                            var maxOrder = order ?? (await con.ExecuteScalarAsync<int>("SELECT COALESCE(MAX(lessonorder),0)+1 FROM lesson"));
+                            var newId = await con.ExecuteScalarAsync<int>(
+                                "INSERT INTO lesson (lessontypeid, lessonorder, isactive, is_premium, level, category) VALUES (1,@ord,true,@prem,@lvl,@cat) RETURNING lessonid",
+                                new { ord = maxOrder, prem = isPremium, lvl = level, cat = category });
+                            await con.ExecuteAsync(
+                                "INSERT INTO lesson_lang (lessonid, languageid, lessonname, description) VALUES (@id,1,@n,@d)",
+                                new { id = newId, n = name, d = desc });
+                        }
+                        imported++;
+                    }
+                    catch { skipped++; }
+                }
+                summary.Add(new { sheet = "Lessons", imported, skipped });
+            }
+
+            if (sheetNames.Contains("Meaning"))
+            {
+                int imported = 0, skipped = 0;
+                foreach (var row in stream.Query(sheetName: "Meaning").Cast<IDictionary<string, object>>())
+                {
+                    var lessonId = I(row, "LessonId");
+                    var word = S(row, "WordName");
+                    if (lessonId == null || string.IsNullOrWhiteSpace(word)) { skipped++; continue; }
+                    try
+                    {
+                        await con.ExecuteAsync(
+                            @"INSERT INTO lesson_word_content (lesson_id, word_name, sentence_pattern, definition_en, definition_ta, example_en, example_ta, display_order)
+                              VALUES (@lid,@wn,@sp,@den,@dta,@een,@eta,@ord)",
+                            new { lid = lessonId.Value, wn = word, sp = S(row, "SentencePattern"), den = S(row, "DefinitionEn") ?? "",
+                                  dta = S(row, "DefinitionTa"), een = S(row, "ExampleEn"), eta = S(row, "ExampleTa"), ord = I(row, "DisplayOrder") ?? 0 });
+                        imported++;
+                    }
+                    catch { skipped++; }
+                }
+                summary.Add(new { sheet = "Meaning", imported, skipped });
+            }
+
+            if (sheetNames.Contains("FillInBlank"))
+            {
+                int imported = 0, skipped = 0;
+                foreach (var row in stream.Query(sheetName: "FillInBlank").Cast<IDictionary<string, object>>())
+                {
+                    var lessonId = I(row, "LessonId");
+                    var qText = S(row, "QuestionText");
+                    var correctOpt = I(row, "CorrectOption");
+                    if (lessonId == null || string.IsNullOrWhiteSpace(qText) || correctOpt is null or < 1 or > 4) { skipped++; continue; }
+                    try
+                    {
+                        var qid = await con.ExecuteScalarAsync<int>(
+                            "INSERT INTO meaningquestion (lessonid) VALUES (@lid) RETURNING questionid", new { lid = lessonId.Value });
+                        await con.ExecuteAsync(
+                            "INSERT INTO meaningquestion_lang (questionid, languageid, questiontext) VALUES (@qid,1,@qt)",
+                            new { qid, qt = qText });
+                        for (int i = 1; i <= 4; i++)
+                        {
+                            var optText = S(row, $"Option{i}");
+                            if (string.IsNullOrWhiteSpace(optText)) continue;
+                            var oid = await con.ExecuteScalarAsync<int>(
+                                "INSERT INTO meaningoption (questionid, iscorrect) VALUES (@qid,@c) RETURNING optionid",
+                                new { qid, c = i == correctOpt });
+                            await con.ExecuteAsync(
+                                "INSERT INTO meaningoption_lang (optionid, languageid, optiontext) VALUES (@oid,1,@t)",
+                                new { oid, t = optText });
+                        }
+                        imported++;
+                    }
+                    catch { skipped++; }
+                }
+                summary.Add(new { sheet = "FillInBlank", imported, skipped });
+            }
+
+            if (sheetNames.Contains("Arrange"))
+            {
+                var (imported, skipped) = await ImportArrangeSheet(con, stream, "Arrange", requireTamil: false);
+                summary.Add(new { sheet = "Arrange", imported, skipped });
+            }
+
+            if (sheetNames.Contains("Translate"))
+            {
+                var (imported, skipped) = await ImportArrangeSheet(con, stream, "Translate", requireTamil: true);
+                summary.Add(new { sheet = "Translate", imported, skipped });
+            }
+
+            if (sheetNames.Contains("Reading"))
+            {
+                int imported = 0, skipped = 0;
+                foreach (var row in stream.Query(sheetName: "Reading").Cast<IDictionary<string, object>>())
+                {
+                    var lessonId = I(row, "LessonId");
+                    var text = S(row, "SentenceText");
+                    if (lessonId == null || string.IsNullOrWhiteSpace(text)) { skipped++; continue; }
+                    try
+                    {
+                        var order = I(row, "DisplayOrder") ?? 0;
+                        var newId = await con.ExecuteScalarAsync<int>(
+                            "INSERT INTO readingsentence (lessonid, displayorder) VALUES (@lid,@ord) RETURNING readingsentenceid",
+                            new { lid = lessonId.Value, ord = order });
+                        await con.ExecuteAsync(
+                            "INSERT INTO readingsentence_lang (readingsentenceid, languageid, sentencetext) VALUES (@id,1,@st)",
+                            new { id = newId, st = text });
+                        imported++;
+                    }
+                    catch { skipped++; }
+                }
+                summary.Add(new { sheet = "Reading", imported, skipped });
+            }
+
+            return Ok(new { message = "Import complete", summary });
+        }
+
+        private static async Task<(int imported, int skipped)> ImportArrangeSheet(
+            System.Data.IDbConnection con, Stream stream, string sheetName, bool requireTamil)
+        {
+            int imported = 0, skipped = 0;
+            foreach (var row in stream.Query(sheetName: sheetName).Cast<IDictionary<string, object>>())
+            {
+                string? S(string key) => row.TryGetValue(key, out var v) && v != null ? v.ToString() : null;
+                var lessonIdStr = S("LessonId");
+                var sentence = S("CorrectSentence");
+                var tamil = S("TamilMeaning");
+                if (!int.TryParse(lessonIdStr, out var lessonId) || string.IsNullOrWhiteSpace(sentence)) { skipped++; continue; }
+                if (requireTamil && string.IsNullOrWhiteSpace(tamil)) { skipped++; continue; }
+                try
+                {
+                    var aid = await con.ExecuteScalarAsync<int>(
+                        "INSERT INTO arrangesentence (lessonid) VALUES (@lid) RETURNING arrangesentenceid", new { lid = lessonId });
+                    await con.ExecuteAsync(
+                        "INSERT INTO arrangesentence_lang (arrangesentenceid, languageid, correctsentence, tamilmeaning) VALUES (@aid,1,@s,@t)",
+                        new { aid, s = sentence, t = string.IsNullOrWhiteSpace(tamil) ? null : tamil });
+                    var words = sentence.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                    for (int i = 0; i < words.Length; i++)
+                    {
+                        var wid = await con.ExecuteScalarAsync<int>(
+                            "INSERT INTO arrangesentenceword (arrangesentenceid, correctorder) VALUES (@aid,@ord) RETURNING wordid",
+                            new { aid, ord = i + 1 });
+                        await con.ExecuteAsync(
+                            "INSERT INTO arrangesentenceword_lang (wordid, languageid, wordtext) VALUES (@wid,1,@w)",
+                            new { wid, w = words[i] });
+                    }
+                    imported++;
+                }
+                catch { skipped++; }
+            }
+            return (imported, skipped);
         }
 
         // ── GET /api/admin/lesson-stats ───────────────────────────────────────
