@@ -627,7 +627,7 @@ namespace SpokenEnglishAPI.Controllers
             if (sheetNames.Contains("Lessons"))
             {
                 int imported = 0, skipped = 0;
-                foreach (var row in stream.Query(sheetName: "Lessons").Cast<IDictionary<string, object>>())
+                foreach (var row in stream.Query(sheetName: "Lessons", useHeaderRow: true).Cast<IDictionary<string, object>>())
                 {
                     var name = S(row, "LessonName");
                     if (string.IsNullOrWhiteSpace(name)) { skipped++; continue; }
@@ -669,7 +669,7 @@ namespace SpokenEnglishAPI.Controllers
             if (sheetNames.Contains("Meaning"))
             {
                 int imported = 0, skipped = 0;
-                foreach (var row in stream.Query(sheetName: "Meaning").Cast<IDictionary<string, object>>())
+                foreach (var row in stream.Query(sheetName: "Meaning", useHeaderRow: true).Cast<IDictionary<string, object>>())
                 {
                     var lessonId = I(row, "LessonId");
                     var word = S(row, "WordName");
@@ -691,7 +691,7 @@ namespace SpokenEnglishAPI.Controllers
             if (sheetNames.Contains("FillInBlank"))
             {
                 int imported = 0, skipped = 0;
-                foreach (var row in stream.Query(sheetName: "FillInBlank").Cast<IDictionary<string, object>>())
+                foreach (var row in stream.Query(sheetName: "FillInBlank", useHeaderRow: true).Cast<IDictionary<string, object>>())
                 {
                     var lessonId = I(row, "LessonId");
                     var qText = S(row, "QuestionText");
@@ -737,7 +737,7 @@ namespace SpokenEnglishAPI.Controllers
             if (sheetNames.Contains("Reading"))
             {
                 int imported = 0, skipped = 0;
-                foreach (var row in stream.Query(sheetName: "Reading").Cast<IDictionary<string, object>>())
+                foreach (var row in stream.Query(sheetName: "Reading", useHeaderRow: true).Cast<IDictionary<string, object>>())
                 {
                     var lessonId = I(row, "LessonId");
                     var text = S(row, "SentenceText");
@@ -765,7 +765,7 @@ namespace SpokenEnglishAPI.Controllers
             System.Data.IDbConnection con, Stream stream, string sheetName, bool requireTamil)
         {
             int imported = 0, skipped = 0;
-            foreach (var row in stream.Query(sheetName: sheetName).Cast<IDictionary<string, object>>())
+            foreach (var row in stream.Query(sheetName: sheetName, useHeaderRow: true).Cast<IDictionary<string, object>>())
             {
                 string? S(string key) => row.TryGetValue(key, out var v) && v != null ? v.ToString() : null;
                 var lessonIdStr = S("LessonId");
