@@ -15,7 +15,12 @@ namespace SpokenEnglishAPI.Controllers
     public class AiConversationController : ControllerBase
     {
         private readonly IAiConversationService _ai;
-        public AiConversationController(IAiConversationService ai) => _ai = ai;
+        private readonly ILogger<AiConversationController> _logger;
+        public AiConversationController(IAiConversationService ai, ILogger<AiConversationController> logger)
+        {
+            _ai = ai;
+            _logger = logger;
+        }
 
         [HttpPost("chat")]
         public async Task<IActionResult> Chat([FromBody] AiChatRequestDto dto)
@@ -49,9 +54,13 @@ namespace SpokenEnglishAPI.Controllers
             {
                 return StatusCode(503, new { message = "AI conversation is not configured yet. Please contact the admin." });
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                return StatusCode(502, new { message = "AI conversation partner is unavailable right now. Please try again in a moment." });
+                _logger.LogError(ex, "AI conversation call failed");
+                // Surface the (key-free) error detail to admins only, to speed up diagnosing
+                // Gemini setup issues (wrong model, invalid key, quota) without a log dive.
+                var debug = User.IsInRole("Admin") ? ex.Message : null;
+                return StatusCode(502, new { message = "AI conversation partner is unavailable right now. Please try again in a moment.", debug });
             }
         }
     }
