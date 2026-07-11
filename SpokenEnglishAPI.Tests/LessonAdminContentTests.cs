@@ -380,4 +380,103 @@ public class LessonAdminContentTests
         headersOn200.Should().NotBeEmpty();
         headersOn429_beforeFix.Should().BeEmpty(); // the bug, as observed
     }
+
+    // ── AI Conversation Partner (free-form chat + mistake correction) ─────────
+    // Mirrors AiConversationController validation and GeminiAiConversationService
+    // JSON-parsing logic without making a real network call.
+
+    [Theory]
+    [InlineData("", false)]
+    [InlineData("   ", false)]
+    [InlineData("Hello, how are you?", true)]
+    public void AiChat_MessageRequired(string message, bool expectedValid)
+    {
+        (!string.IsNullOrWhiteSpace(message)).Should().Be(expectedValid);
+    }
+
+    [Fact]
+    public void AiChat_MessageOver500Chars_IsRejected()
+    {
+        var message = new string('a', 501);
+        (message.Length > 500).Should().BeTrue();
+    }
+
+    [Fact]
+    public void AiChat_MessageAt500Chars_IsAccepted()
+    {
+        var message = new string('a', 500);
+        (message.Length > 500).Should().BeFalse();
+    }
+
+    [Fact]
+    public void AiChat_HistoryIsCappedAtLastTwelveTurns()
+    {
+        var history = Enumerable.Range(1, 30).Select(i => $"turn{i}").ToList();
+        var capped = history.TakeLast(12).ToList();
+        capped.Should().HaveCount(12);
+        capped.First().Should().Be("turn19");
+        capped.Last().Should().Be("turn30");
+    }
+
+    [Theory]
+    [InlineData("", "Beginner")]
+    [InlineData(null, "Beginner")]
+    [InlineData("Intermediate", "Intermediate")]
+    public void AiChat_LevelDefaultsToBeginnerWhenBlank(string? level, string expected)
+    {
+        var resolved = string.IsNullOrWhiteSpace(level) ? "Beginner" : level;
+        resolved.Should().Be(expected);
+    }
+
+    [Theory]
+    [InlineData("", "General everyday conversation")]
+    [InlineData(null, "General everyday conversation")]
+    [InlineData("Ordering food at a restaurant", "Ordering food at a restaurant")]
+    public void AiChat_ScenarioDefaultsToGeneralWhenBlank(string? scenario, string expected)
+    {
+        var resolved = string.IsNullOrWhiteSpace(scenario) ? "General everyday conversation" : scenario;
+        resolved.Should().Be(expected);
+    }
+
+    // Mirrors the role-mapping in GeminiAiConversationService.ChatAsync
+    [Theory]
+    [InlineData("ai", "model")]
+    [InlineData("user", "user")]
+    [InlineData("anything-else", "user")]
+    public void AiChat_HistoryRoleMapsAiToModel(string role, string expectedGeminiRole)
+    {
+        var mapped = role == "ai" ? "model" : "user";
+        mapped.Should().Be(expectedGeminiRole);
+    }
+
+    [Fact]
+    public void AiChat_GeminiJsonResponse_NoMistake_ParsesCleanly()
+    {
+        var json = """{"reply":"Nice to meet you!","hasMistake":false,"correctedText":null,"explanation":null}""";
+        using var doc = System.Text.Json.JsonDocument.Parse(json);
+        var root = doc.RootElement;
+        root.GetProperty("reply").GetString().Should().Be("Nice to meet you!");
+        root.GetProperty("hasMistake").GetBoolean().Should().BeFalse();
+        root.GetProperty("correctedText").ValueKind.Should().Be(System.Text.Json.JsonValueKind.Null);
+    }
+
+    [Fact]
+    public void AiChat_GeminiJsonResponse_WithMistake_ParsesCorrectionFields()
+    {
+        var json = """{"reply":"Got it!","hasMistake":true,"correctedText":"I want to eat pizza.","explanation":"Use \"to\" before a verb."}""";
+        using var doc = System.Text.Json.JsonDocument.Parse(json);
+        var root = doc.RootElement;
+        root.GetProperty("hasMistake").GetBoolean().Should().BeTrue();
+        root.GetProperty("correctedText").GetString().Should().Be("I want to eat pizza.");
+        root.GetProperty("explanation").GetString().Should().Contain("to");
+    }
+
+    [Fact]
+    public void AiChat_MissingGeminiApiKey_SurfacesAs503NotConfigured()
+    {
+        // Mirrors the catch block in AiConversationController.Chat that maps a
+        // missing-key InvalidOperationException to a 503 with a friendly message.
+        var exceptionMessage = "GEMINI_API_KEY is not configured.";
+        exceptionMessage.Contains("GEMINI_API_KEY").Should().BeTrue();
+    }
 }

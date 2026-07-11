@@ -140,6 +140,9 @@ namespace SpokenEnglishAPI
             // Email alert service (exception notifications)
             builder.Services.AddSingleton<IEmailAlertService, EmailAlertService>();
 
+            // AI conversation partner (Gemini) — HttpClient reused across requests
+            builder.Services.AddHttpClient<IAiConversationService, GeminiAiConversationService>();
+
             // Audit logging (login/register/admin actions)
             builder.Services.AddScoped<IAuditLogService, AuditLogService>();
 
